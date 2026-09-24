@@ -1444,6 +1444,42 @@ button.ghost-select {
   }
 }
 
+/* region fab */
+
+.fab {
+  display: none;
+  position: fixed;
+  inset-block-end: max(var(--op-space-large), env(safe-area-inset-bottom));
+  inset-inline-end: var(--op-space-large);
+  z-index: var(--op-z-index-footer);
+  place-items: center;
+  inline-size: 5.6rem;
+  block-size: 5.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--op-radius-small);
+  background-color: var(--td-accent-fill);
+  box-shadow: var(--op-shadow-medium);
+  color: var(--td-on-accent);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+
+  &:active {
+    background-color: var(--td-accent-fill-hover);
+  }
+
+  &:focus-visible {
+    outline: var(--op-border-width-large) solid var(--td-accent);
+    outline-offset: var(--op-border-width-large);
+  }
+
+  .icon {
+    --__op-icon-font-size: var(--op-font-x-large);
+
+    color: inherit;
+  }
+}
+
 /* region phone */
 
 @media (width < 768px) {
@@ -1512,5 +1548,22 @@ button.ghost-select {
 
   .toast {
     inset-inline: var(--op-space-medium);
+    inset-block-end: calc(max(var(--op-space-large), env(safe-area-inset-bottom)) + 5.6rem + var(--op-space-small));
+  }
+
+  .fab {
+    display: grid;
+  }
+
+  .app:has(.modal-wrapper--active) .fab {
+    display: none;
+  }
+
+  .board {
+    padding-block-end: calc(5.6rem + 2 * var(--op-space-large));
+  }
+
+  .board-column .board-column__footer {
+    display: none;
   }
 }

@@ -1295,6 +1295,7 @@ $('#connect-forget').addEventListener('click', () => {
 
 document.querySelectorAll('#connect [data-close]').forEach((el) => el.addEventListener('click', closeConnect));
 $('#open-settings').addEventListener('click', openConnect);
+$('#add-fab').addEventListener('click', () => startAdding(ui.activeCategory ?? UNCATEGORIZED));
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
