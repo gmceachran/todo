@@ -16,6 +16,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:ital,wght@0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@rolemodel/optics@2.4.0/dist/css/optics.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.2/src/regular/style.css" />
     <link rel="stylesheet" href="styles.css" />
     <script type="module" src="app.js"></script>
   </head>
@@ -50,12 +51,12 @@
             >
               <span id="tag-menu-icon" class="tag-menu__lead"></span>
               <span id="tag-menu-label" class="ghost-select__label">Tags</span>
-              <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">expand_more</span>
+              <i class="ph ph-caret-down icon" aria-hidden="true"></i>
             </button>
             <div id="tag-menu-list" class="tag-menu__list" popover role="listbox" aria-label="Filter by tag"></div>
           </div>
           <button id="open-settings" class="quiet-button quiet-button--icon" type="button" aria-label="Settings">
-            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">settings</span>
+            <i class="ph ph-gear-six icon" aria-hidden="true"></i>
           </button>
         </div>
       </div>
@@ -79,7 +80,7 @@
         <div class="editor__crumbs">
           <span id="editor-crumb" class="editor__crumb"></span>
           <button class="editor__close" type="button" data-close aria-label="Close">
-            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">close</span>
+            <i class="ph ph-x icon" aria-hidden="true"></i>
           </button>
         </div>
         <input id="editor-title" class="editor__title" name="title" placeholder="Task title" required autocomplete="off" />
@@ -88,15 +89,15 @@
 
         <div class="editor__props">
           <label class="prop">
-            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">folder</span>
+            <i class="ph ph-folder-simple icon" aria-hidden="true"></i>
             <select id="editor-category" class="prop__control" name="category" aria-label="Category"></select>
           </label>
           <label class="prop">
-            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">calendar_today</span>
+            <i class="ph ph-calendar-blank icon" aria-hidden="true"></i>
             <input id="editor-due" class="prop__control" type="date" name="due" aria-label="Due date" />
           </label>
           <label class="prop">
-            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">repeat</span>
+            <i class="ph ph-repeat icon" aria-hidden="true"></i>
             <select id="editor-repeat" class="prop__control" name="repeat" aria-label="Repeat">
               <option value="">No repeat</option>
               <option value="daily">Daily</option>
@@ -108,7 +109,7 @@
             </select>
           </label>
           <div id="editor-tag-field" class="prop prop--grow tag-field">
-            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">sell</span>
+            <i class="ph ph-tag icon" aria-hidden="true"></i>
             <span id="editor-tag-chips" class="tag-field__chips"></span>
             <input
               id="editor-tags"
@@ -140,20 +141,20 @@
 
     <div id="column-menu" class="tag-menu__list column-menu" popover role="menu" aria-label="Category actions">
       <button class="tag-menu__option" type="button" role="menuitem" data-action="rename">
-        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">edit</span>
+        <i class="ph ph-pencil-simple icon" aria-hidden="true"></i>
         <span class="tag-menu__name">Rename</span>
       </button>
       <button class="tag-menu__option" type="button" role="menuitem" data-action="left">
-        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">arrow_back</span>
+        <i class="ph ph-arrow-left icon" aria-hidden="true"></i>
         <span class="tag-menu__name">Move left</span>
       </button>
       <button class="tag-menu__option" type="button" role="menuitem" data-action="right">
-        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">arrow_forward</span>
+        <i class="ph ph-arrow-right icon" aria-hidden="true"></i>
         <span class="tag-menu__name">Move right</span>
       </button>
       <div class="tag-menu__divider" role="separator"></div>
       <button class="tag-menu__option tag-menu__option--danger" type="button" role="menuitem" data-action="delete">
-        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">delete</span>
+        <i class="ph ph-trash icon" aria-hidden="true"></i>
         <span class="tag-menu__name">Delete category</span>
       </button>
     </div>

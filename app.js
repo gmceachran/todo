@@ -98,7 +98,7 @@ function h(tag, props = {}, ...children) {
 }
 
 const icon = (name) =>
-  h('span', { class: 'material-symbols-outlined icon icon--weight-light', 'aria-hidden': 'true' }, name);
+  h('i', { class: `ph ph-${name} icon`, 'aria-hidden': 'true' });
 
 const shortDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 const weekdayName = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' });
@@ -166,7 +166,7 @@ function noteLinks(notes = '') {
   return links;
 }
 
-const SOURCE_ICONS = { linear: 'change_history', slack: 'tag', gmail: 'mail' };
+const SOURCE_ICONS = { linear: 'triangle', slack: 'hash', gmail: 'envelope-simple' };
 const sourceIcon = (key) => SOURCE_ICONS[key.split(':')[0]] ?? 'link';
 
 const tasks = () => state.doc.tasks;
@@ -377,7 +377,7 @@ function renderTagMenu() {
     ...allTags.map((tag) => option(tag, tag, tagCounts.get(tag) || 0))
   );
   $('#tag-menu-label').textContent = ui.tag || 'Tags';
-  $('#tag-menu-icon').replaceChildren(ui.tag ? tagDot(ui.tag) : icon('sell'));
+  $('#tag-menu-icon').replaceChildren(ui.tag ? tagDot(ui.tag) : icon('tag'));
 }
 
 function columns() {
@@ -425,7 +425,7 @@ function renderCard(t, { done = false } = {}) {
       h(
         'span',
         { class: `task-card__meta-item${due.state ? ` task-card__meta-item--${due.state}` : ''}` },
-        icon('calendar_today'),
+        icon('calendar-blank'),
         due.label
       ),
     t.repeat && h('span', { class: 'task-card__meta-item' }, icon('repeat'), describeRepeat(t.repeat)),
@@ -600,7 +600,7 @@ function renderColumn(c, index, list) {
                 openColumnMenu(c.id, e.currentTarget);
               },
             },
-            icon('more_horiz')
+            icon('dots-three')
           ),
       done.length
         ? h(
@@ -632,7 +632,7 @@ function renderColumn(c, index, list) {
       'footer',
       { class: 'board-column__footer' },
       !isLoose &&
-        h('button', { class: 'quiet-button', type: 'button', onclick: () => startAdding(c.id) }, icon('add'), 'Add task')
+        h('button', { class: 'quiet-button', type: 'button', onclick: () => startAdding(c.id) }, icon('plus'), 'Add task')
     )
   );
   return column;
@@ -684,7 +684,7 @@ function renderGhostColumn() {
             $('[data-new-category]')?.focus();
           },
         },
-        icon('add'),
+        icon('plus'),
         'Add category'
       );
   return h('section', { class: 'board-column board-column--ghost' }, h('header', { class: 'board-column__header' }, body));
@@ -898,7 +898,7 @@ function renderEditorLinks(notes) {
         h(
           'a',
           { class: 'editor__link', href: link.url, target: '_blank', rel: 'noopener' },
-          icon('arrow_outward'),
+          icon('arrow-up-right'),
           h('span', { class: 'editor__link-label' }, link.label),
           h('span', { class: 'editor__link-host' }, link.host)
         )
@@ -999,7 +999,7 @@ function renderTagChips() {
               if (tagSuggest.matches(':popover-open')) renderTagSuggest();
             },
           },
-          icon('close')
+          icon('x')
         )
       )
     )
@@ -1045,7 +1045,7 @@ function renderTagSuggest() {
                 }
               },
             },
-            option.create ? icon('add') : tagDot(option.tag),
+            option.create ? icon('plus') : tagDot(option.tag),
             option.create
               ? h('span', { class: 'tag-menu__name' }, 'Create ', h('b', {}, option.tag))
               : h('span', { class: 'tag-menu__name' }, option.tag)
