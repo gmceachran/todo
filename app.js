@@ -65,7 +65,7 @@ const ui = {
   tag: '',
   activeCategory: savedUi.activeCategory ?? null,
   showDone: new Set(),
-  addingIn: null,
+  creatingIn: null,
   addingCategory: false,
   renamingId: null,
   editingId: null,
@@ -292,7 +292,7 @@ async function refresh() {
 function isEditing() {
   const active = document.activeElement;
   const typing = active?.closest?.('.board') && active.matches('input') && active.value.trim() !== '';
-  return Boolean(ui.editingId || ui.deletingId || ui.renamingId || typing);
+  return Boolean(ui.editingId || ui.creatingIn || ui.deletingId || ui.renamingId || typing);
 }
 
 function safeRender() {
@@ -495,54 +495,15 @@ function renderCard(t, { done = false } = {}) {
 }
 
 function startAdding(columnId) {
-  ui.addingIn = columnId;
-  render();
-  $(`[data-add-input="${columnId}"]`)?.focus();
+  openNewTask(columnId);
 }
 
 function stopEditingInline() {
-  ui.addingIn = null;
   ui.addingCategory = false;
   ui.renamingId = null;
   setTimeout(() => {
     if (!isEditing()) render();
   });
-}
-
-function renderAddForm(columnId) {
-  return h(
-    'form',
-    {
-      class: 'board-column__add-form',
-      onsubmit: (e) => {
-        e.preventDefault();
-        const { title, tags } = parseTitle(e.target.elements.title.value);
-        if (!title) return;
-        e.target.elements.title.value = '';
-        dispatch([
-          {
-            type: 'add',
-            task: { id: makeId(), title, tags, category: columnId === UNCATEGORIZED ? null : columnId, addedBy: 'app' },
-          },
-        ]);
-        $(`[data-add-input="${columnId}"]`)?.focus();
-      },
-    },
-    h('input', {
-      class: 'board-column__add-input',
-      name: 'title',
-      placeholder: 'Task title, #tags',
-      autocomplete: 'off',
-      'aria-label': 'New task title',
-      dataset: { addInput: columnId },
-      onkeydown: (e) => {
-        if (e.key === 'Escape') stopEditingInline();
-      },
-      onblur: (e) => {
-        if (!e.target.value) stopEditingInline();
-      },
-    })
-  );
 }
 
 function renderRename(c) {
@@ -664,15 +625,13 @@ function renderColumn(c, index, list) {
       'div',
       { class: 'board-column__cards' },
       open.map((t) => renderCard(t)),
-      !open.length && ui.addingIn !== c.id && h('p', { class: 'board-column__empty' }, 'No tasks'),
-      ui.addingIn === c.id && renderAddForm(c.id),
+      !open.length && h('p', { class: 'board-column__empty' }, 'No tasks'),
       showingDone && done.map((t) => renderCard(t, { done: true }))
     ),
     h(
       'footer',
       { class: 'board-column__footer' },
-      ui.addingIn !== c.id &&
-        !isLoose &&
+      !isLoose &&
         h('button', { class: 'quiet-button', type: 'button', onclick: () => startAdding(c.id) }, icon('add'), 'Add task')
     )
   );
@@ -755,7 +714,6 @@ function renderEmptyBoard() {
 
 function focusedField() {
   const data = document.activeElement?.dataset ?? {};
-  if (data.addInput) return `[data-add-input="${data.addInput}"]`;
   if ('newCategory' in data) return '[data-new-category]';
   return null;
 }
@@ -868,7 +826,9 @@ function openEditor(id) {
   const t = findTaskById(id);
   if (!t) return;
   ui.editingId = id;
+  ui.creatingIn = null;
   const form = $('#editor-form');
+  setEditorMode('edit');
   form.elements.title.value = t.title;
   form.elements.notes.value = t.notes || '';
   renderEditorLinks(t.notes);
@@ -894,6 +854,34 @@ function openEditor(id) {
         ]
       : [])
   );
+  showModal('#editor');
+  setTimeout(() => form.elements.title.focus(), 50);
+}
+
+function setEditorMode(mode) {
+  const creating = mode === 'create';
+  $('#editor-delete').hidden = creating;
+  $('#editor-submit').textContent = creating ? 'Add task' : 'Save';
+  $('#editor-form').setAttribute('aria-label', creating ? 'New task' : 'Edit task');
+}
+
+function openNewTask(columnId) {
+  ui.creatingIn = columnId;
+  ui.editingId = null;
+  const form = $('#editor-form');
+  setEditorMode('create');
+  form.elements.title.value = '';
+  form.elements.notes.value = '';
+  renderEditorLinks('');
+  form.elements.due.value = '';
+  editorTags = [];
+  form.elements.tagQuery.value = '';
+  renderTagChips();
+  form.elements.category.replaceChildren(...categoryOptions(columnId));
+  form.elements.repeat.querySelector('[value="custom"]')?.remove();
+  form.elements.repeat.value = '';
+  $('#editor-crumb').textContent = `New task · ${categoryName(columnId === UNCATEGORIZED ? null : columnId)}`;
+  $('#editor-source').replaceChildren();
   showModal('#editor');
   setTimeout(() => form.elements.title.focus(), 50);
 }
@@ -925,16 +913,35 @@ function closeEditor() {
   closeTagSuggest();
   hideModal('#editor');
   ui.editingId = null;
+  ui.creatingIn = null;
   if (state.stale) render();
 }
 
 $('#editor-form').addEventListener('submit', (e) => {
   e.preventDefault();
-  const t = findTaskById(ui.editingId);
-  if (!t) return closeEditor();
   const f = e.target.elements;
   commitTag(f.tagQuery.value);
   const category = f.category.value === UNCATEGORIZED ? null : f.category.value;
+  if (ui.creatingIn) {
+    const { title, tags } = parseTitle(f.title.value);
+    if (!title) return f.title.focus();
+    const task = {
+      id: makeId(),
+      title,
+      notes: f.notes.value,
+      category,
+      tags: [...new Set([...editorTags, ...tags])],
+      due: f.due.value || null,
+      repeat: f.repeat.value || null,
+      addedBy: 'app',
+    };
+    ui.activeCategory = category ?? UNCATEGORIZED;
+    closeEditor();
+    dispatch([{ type: 'add', task }]);
+    return;
+  }
+  const t = findTaskById(ui.editingId);
+  if (!t) return closeEditor();
   const patch = {
     title: f.title.value.trim() || t.title,
     notes: f.notes.value,
@@ -1291,7 +1298,7 @@ $('#open-settings').addEventListener('click', openConnect);
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
-  if (ui.editingId) closeEditor();
+  if (ui.editingId || ui.creatingIn) closeEditor();
   else if (ui.deletingId) closeDeleteCategory();
   else if ($('#connect').classList.contains('modal-wrapper--active')) closeConnect();
 });

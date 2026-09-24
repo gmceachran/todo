@@ -76,6 +76,10 @@
   --td-chrome-hover: var(--td-hover);
 }
 
+[hidden] {
+  display: none !important;
+}
+
 ::selection {
   background-color: var(--op-color-primary-plus-five);
   color: var(--td-text);
