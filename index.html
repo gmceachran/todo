@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Todo</title>
+    <meta name="description" content="Gabe's task board" />
+    <meta name="theme-color" content="#fcf9f8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#2c2522" media="(prefers-color-scheme: dark)" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Todo" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-180.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lora:ital,wght@0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@rolemodel/optics@2.4.0/dist/css/optics.min.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body class="app">
+    <header class="masthead">
+      <div class="masthead__lede">
+        <h1 id="today-label" class="masthead__title"></h1>
+        <p id="deck" class="masthead__deck"></p>
+      </div>
+
+      <div class="masthead__toolbar">
+        <div class="view-tabs" role="radiogroup" aria-label="Show">
+          <input class="view-tabs__input" type="radio" name="filter" id="filter-all" value="all" checked />
+          <label class="view-tabs__label" for="filter-all">All</label>
+          <input class="view-tabs__input" type="radio" name="filter" id="filter-today" value="today" />
+          <label class="view-tabs__label" for="filter-today">Today</label>
+          <input class="view-tabs__input" type="radio" name="filter" id="filter-week" value="week" />
+          <label class="view-tabs__label" for="filter-week">This week</label>
+          <input class="view-tabs__input" type="radio" name="filter" id="filter-overdue" value="overdue" />
+          <label class="view-tabs__label" for="filter-overdue">Overdue</label>
+        </div>
+
+        <div class="masthead__end">
+          <span id="dateline" class="masthead__dateline label"></span>
+          <div class="tag-menu">
+            <button
+              id="tag-menu-button"
+              class="ghost-select"
+              type="button"
+              popovertarget="tag-menu-list"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+            >
+              <span id="tag-menu-icon" class="tag-menu__lead"></span>
+              <span id="tag-menu-label" class="ghost-select__label">Tags</span>
+              <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">expand_more</span>
+            </button>
+            <div id="tag-menu-list" class="tag-menu__list" popover role="listbox" aria-label="Filter by tag"></div>
+          </div>
+          <button id="open-settings" class="quiet-button quiet-button--icon" type="button" aria-label="Settings">
+            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">settings</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <section class="workspace" aria-label="Workspace">
+      <div class="workspace__bar">
+        <span class="workspace__lights" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span id="crumbs" class="workspace__crumbs"></span>
+        <button id="sync-status" class="workspace__status" type="button" data-state="idle" title="Sync now">
+          <i aria-hidden="true"></i><span id="sync-label">Synced</span>
+        </button>
+      </div>
+      <nav id="category-tabs" class="category-tabs" aria-label="Categories"></nav>
+      <main id="board" class="board" aria-label="Task board"></main>
+    </section>
+
+    <div id="editor" class="modal-wrapper" aria-hidden="true">
+      <div class="modal-wrapper__backdrop" data-close></div>
+      <form id="editor-form" class="modal editor" role="dialog" aria-modal="true" aria-label="Edit task">
+        <div class="editor__crumbs">
+          <span id="editor-crumb" class="editor__crumb"></span>
+          <button class="editor__close" type="button" data-close aria-label="Close">
+            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">close</span>
+          </button>
+        </div>
+        <input id="editor-title" class="editor__title" name="title" placeholder="Task title" required autocomplete="off" />
+        <textarea id="editor-notes" class="editor__notes" name="notes" rows="3" placeholder="Add notes…"></textarea>
+
+        <div class="editor__props">
+          <label class="prop">
+            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">folder</span>
+            <select id="editor-category" class="prop__control" name="category" aria-label="Category"></select>
+          </label>
+          <label class="prop">
+            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">calendar_today</span>
+            <input id="editor-due" class="prop__control" type="date" name="due" aria-label="Due date" />
+          </label>
+          <label class="prop">
+            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">repeat</span>
+            <select id="editor-repeat" class="prop__control" name="repeat" aria-label="Repeat">
+              <option value="">No repeat</option>
+              <option value="daily">Daily</option>
+              <option value="weekdays">Weekdays</option>
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Every 2 weeks</option>
+              <option value="monthly">Monthly</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </label>
+          <label class="prop prop--grow">
+            <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">sell</span>
+            <input id="editor-tags" class="prop__control" name="tags" placeholder="Tags" autocomplete="off" aria-label="Tags" />
+          </label>
+        </div>
+
+        <footer class="editor__footer">
+          <p id="editor-source" class="editor__source"></p>
+          <button id="editor-delete" class="quiet-button quiet-button--danger" type="button">Delete</button>
+          <button class="quiet-button" type="button" data-close>Cancel</button>
+          <button class="quiet-button quiet-button--primary" type="submit">Save</button>
+        </footer>
+      </form>
+    </div>
+
+    <div id="column-menu" class="tag-menu__list column-menu" popover role="menu" aria-label="Category actions">
+      <button class="tag-menu__option" type="button" role="menuitem" data-action="rename">
+        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">edit</span>
+        <span class="tag-menu__name">Rename</span>
+      </button>
+      <button class="tag-menu__option" type="button" role="menuitem" data-action="left">
+        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">arrow_back</span>
+        <span class="tag-menu__name">Move left</span>
+      </button>
+      <button class="tag-menu__option" type="button" role="menuitem" data-action="right">
+        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">arrow_forward</span>
+        <span class="tag-menu__name">Move right</span>
+      </button>
+      <div class="tag-menu__divider" role="separator"></div>
+      <button class="tag-menu__option tag-menu__option--danger" type="button" role="menuitem" data-action="delete">
+        <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">delete</span>
+        <span class="tag-menu__name">Delete category</span>
+      </button>
+    </div>
+
+    <div id="delete-category" class="modal-wrapper" aria-hidden="true">
+      <div class="modal-wrapper__backdrop" data-close></div>
+      <form id="delete-category-form" class="modal editor dialog" role="dialog" aria-modal="true" aria-labelledby="delete-category-title">
+        <div class="dialog__body">
+          <h2 id="delete-category-title" class="dialog__title"></h2>
+          <p id="delete-category-lede" class="dialog__lede"></p>
+          <fieldset id="delete-category-choices" class="dialog__choices">
+            <legend class="label">Its tasks</legend>
+            <label class="choice">
+              <input type="radio" name="fate" value="move" checked />
+              <span>Move them to</span>
+              <select name="moveTo" class="choice__select" aria-label="Destination category"></select>
+            </label>
+            <label class="choice">
+              <input type="radio" name="fate" value="delete" />
+              <span>Delete them too</span>
+            </label>
+          </fieldset>
+        </div>
+        <footer class="editor__footer">
+          <span class="editor__source"></span>
+          <button class="quiet-button" type="button" data-close>Cancel</button>
+          <button class="quiet-button quiet-button--danger-fill" type="submit">Delete category</button>
+        </footer>
+      </form>
+    </div>
+
+    <div id="connect" class="modal-wrapper" aria-hidden="true">
+      <div class="modal-wrapper__backdrop" data-close></div>
+      <form id="connect-form" class="modal editor dialog" role="dialog" aria-modal="true" aria-labelledby="connect-title">
+        <div class="dialog__body">
+          <h2 id="connect-title" class="dialog__title">Connect your task repo</h2>
+          <p class="dialog__lede">
+            Your tasks live in <code>tasks.json</code> in a private GitHub repo. Make a
+            <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a>
+            that can only see that repo, with <b>Contents: Read and write</b>. It stays on this device.
+          </p>
+          <label class="field">
+            <span class="label">Repository</span>
+            <input class="field__input" name="repo" required spellcheck="false" autocapitalize="off" autocomplete="off" value="gmceachran/todo-data" />
+          </label>
+          <label class="field">
+            <span class="label">Token</span>
+            <input class="field__input" name="token" type="password" required spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="github_pat_…" />
+          </label>
+          <p id="connect-error" class="dialog__error" role="alert" hidden></p>
+        </div>
+        <footer class="editor__footer">
+          <button id="connect-forget" class="quiet-button quiet-button--danger" type="button" hidden>Forget this device</button>
+          <span class="editor__source"></span>
+          <button id="connect-cancel" class="quiet-button" type="button" data-close>Cancel</button>
+          <button class="quiet-button quiet-button--primary" type="submit">Connect</button>
+        </footer>
+      </form>
+    </div>
+
+    <div id="toast" class="toast" role="status" hidden>
+      <span id="toast-text"></span>
+      <button id="toast-undo" class="toast__action" type="button">Undo</button>
+    </div>
+  </body>
+</html>

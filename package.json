@@ -1,0 +1,12 @@
+{
+  "name": "todo",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "tasks": "cli/tasks.mjs"
+  },
+  "scripts": {
+    "test": "node --test",
+    "serve": "python3 -m http.server 8787"
+  }
+}
