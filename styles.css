@@ -1447,6 +1447,10 @@ button.ghost-select {
 /* region phone */
 
 @media (width < 768px) {
+  html {
+    overflow: auto;
+  }
+
   .app {
     block-size: auto;
     min-block-size: 100dvh;
