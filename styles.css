@@ -1449,6 +1449,11 @@ button.ghost-select {
 @media (width < 768px) {
   html {
     overflow: auto;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   .app {
