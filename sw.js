@@ -1,4 +1,4 @@
-const VERSION = 'todo-v1';
+const VERSION = 'todo-v2';
 const SHELL = [
   './',
   './index.html',
@@ -30,7 +30,7 @@ self.addEventListener('activate', (event) => {
 async function networkFirst(request) {
   const cache = await caches.open(VERSION);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request.url, { cache: 'no-cache', credentials: 'same-origin' });
     if (response.ok) cache.put(request, response.clone());
     return response;
   } catch (error) {
