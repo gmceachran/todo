@@ -1483,6 +1483,35 @@ button.ghost-select {
 /* region phone */
 
 @media (width < 768px) {
+  :root {
+    --op-radius-small: 3px;
+    --op-radius-medium: 4px;
+    --op-radius-large: 6px;
+    --op-radius-x-large: 8px;
+    --op-radius-2x-large: 10px;
+    --op-radius-pill: 9999px;
+    --op-radius-circle: 50%;
+  }
+
+  .workspace {
+    overflow: clip;
+    border-radius: var(--op-radius-large);
+  }
+
+  .board-column {
+    overflow: clip;
+    border-radius: var(--op-radius-medium);
+  }
+
+  .task-card__tag,
+  .tag-chip {
+    border-radius: var(--op-radius-small);
+  }
+
+  .task-card .task-card__check {
+    border-radius: var(--op-radius-small);
+  }
+
   html {
     overflow: auto;
     scrollbar-width: none;
@@ -1553,6 +1582,7 @@ button.ghost-select {
 
   .fab {
     display: grid;
+    border-radius: var(--op-radius-large);
   }
 
   .app:has(.modal-wrapper--active) .fab {
