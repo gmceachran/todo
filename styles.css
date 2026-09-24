@@ -248,6 +248,88 @@ button.ghost-select {
 
 /* region tag-menu */
 
+.task-card__tag,
+.tag-chip {
+  --__td-tag-ink: color-mix(in oklab, var(--td-tag-clay-ink) var(--td-tag-mix, 50%), var(--td-tag-sage-ink));
+
+  background-color: color-mix(in oklab, var(--td-tag-clay-bg) var(--td-tag-mix, 50%), var(--td-tag-sage-bg));
+  box-shadow: inset 0 0 0 var(--op-border-width) color-mix(in srgb, var(--__td-tag-ink) 30%, transparent);
+  color: var(--__td-tag-ink);
+  font-weight: var(--op-font-weight-medium);
+}
+
+.tag-field {
+  flex-wrap: wrap;
+  row-gap: var(--op-space-3x-small);
+  cursor: text;
+
+  .tag-field__chips {
+    display: contents;
+  }
+
+  .tag-field__input {
+    flex: 1;
+    min-inline-size: calc(20 * var(--op-size-unit));
+  }
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--op-space-3x-small);
+  padding: 0 var(--op-space-3x-small) 0 var(--op-space-x-small);
+  font-size: var(--td-font-meta);
+  line-height: var(--op-line-height-base);
+
+  .tag-chip__remove {
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+    opacity: var(--op-opacity-half);
+
+    &:hover,
+    &:focus-visible {
+      outline: none;
+      opacity: var(--op-opacity-full);
+    }
+
+    .icon {
+      --__op-icon-font-size: var(--op-font-x-small);
+
+      color: inherit;
+    }
+  }
+}
+
+.tag-suggest {
+  max-block-size: calc(64 * var(--op-size-unit));
+  overflow-y: auto;
+
+  .tag-menu__option[aria-selected='true'] {
+    background-color: var(--td-hover);
+    font-weight: var(--op-font-weight-normal);
+  }
+
+  .tag-suggest__create {
+    color: var(--td-muted);
+
+    b {
+      color: var(--td-text);
+      font-weight: var(--op-font-weight-medium);
+    }
+  }
+
+  .tag-suggest__empty {
+    margin: 0;
+    padding: var(--op-space-x-small);
+    color: var(--td-muted);
+  }
+}
+
 .tag-dot {
   flex: none;
   inline-size: var(--op-space-x-small);
@@ -930,13 +1012,6 @@ button.ghost-select {
 
   .task-card__tag {
     padding: 0 var(--op-space-x-small);
-    border-radius: var(--op-radius-pill);
-    --__td-tag-ink: color-mix(in oklab, var(--td-tag-clay-ink) var(--td-tag-mix, 50%), var(--td-tag-sage-ink));
-
-    background-color: color-mix(in oklab, var(--td-tag-clay-bg) var(--td-tag-mix, 50%), var(--td-tag-sage-bg));
-    box-shadow: inset 0 0 0 var(--op-border-width) color-mix(in srgb, var(--__td-tag-ink) 30%, transparent);
-    color: var(--__td-tag-ink);
-    font-weight: var(--op-font-weight-medium);
     line-height: var(--op-line-height-base);
   }
 }

@@ -107,10 +107,24 @@
               <option value="yearly">Yearly</option>
             </select>
           </label>
-          <label class="prop prop--grow">
+          <div id="editor-tag-field" class="prop prop--grow tag-field">
             <span class="material-symbols-outlined icon icon--weight-light" aria-hidden="true">sell</span>
-            <input id="editor-tags" class="prop__control" name="tags" placeholder="Tags" autocomplete="off" aria-label="Tags" />
-          </label>
+            <span id="editor-tag-chips" class="tag-field__chips"></span>
+            <input
+              id="editor-tags"
+              class="prop__control tag-field__input"
+              name="tagQuery"
+              placeholder="Add tag"
+              autocomplete="off"
+              spellcheck="false"
+              autocapitalize="off"
+              role="combobox"
+              aria-label="Add a tag"
+              aria-autocomplete="list"
+              aria-expanded="false"
+              aria-controls="tag-suggest"
+            />
+          </div>
         </div>
 
         <footer class="editor__footer">
@@ -121,6 +135,8 @@
         </footer>
       </form>
     </div>
+
+    <div id="tag-suggest" class="tag-menu__list tag-suggest" popover="manual" role="listbox" aria-label="Tag suggestions"></div>
 
     <div id="column-menu" class="tag-menu__list column-menu" popover role="menu" aria-label="Category actions">
       <button class="tag-menu__option" type="button" role="menuitem" data-action="rename">

@@ -1,5 +1,6 @@
 import {
   addDays,
+  normalizeTags,
   applyOp,
   daysBetween,
   decodeImport,
@@ -872,7 +873,9 @@ function openEditor(id) {
   form.elements.notes.value = t.notes || '';
   renderEditorLinks(t.notes);
   form.elements.due.value = t.due || '';
-  form.elements.tags.value = t.tags.join(', ');
+  editorTags = [...t.tags];
+  form.elements.tagQuery.value = '';
+  renderTagChips();
   form.elements.category.replaceChildren(...categoryOptions(columnOf(t)));
   const repeat = form.elements.repeat;
   repeat.querySelector('[value="custom"]')?.remove();
@@ -919,6 +922,7 @@ function renderEditorLinks(notes) {
 $('#editor-notes').addEventListener('input', (e) => renderEditorLinks(e.target.value));
 
 function closeEditor() {
+  closeTagSuggest();
   hideModal('#editor');
   ui.editingId = null;
   if (state.stale) render();
@@ -929,12 +933,13 @@ $('#editor-form').addEventListener('submit', (e) => {
   const t = findTaskById(ui.editingId);
   if (!t) return closeEditor();
   const f = e.target.elements;
+  commitTag(f.tagQuery.value);
   const category = f.category.value === UNCATEGORIZED ? null : f.category.value;
   const patch = {
     title: f.title.value.trim() || t.title,
     notes: f.notes.value,
     category,
-    tags: f.tags.value,
+    tags: editorTags,
     due: f.due.value || null,
   };
   if (f.repeat.value !== 'custom') patch.repeat = f.repeat.value || null;
@@ -954,6 +959,163 @@ $('#editor-delete').addEventListener('click', () => {
 });
 
 document.querySelectorAll('#editor [data-close]').forEach((el) => el.addEventListener('click', closeEditor));
+
+// region tag picker
+
+let editorTags = [];
+let tagHighlight = 0;
+let tagNavigated = false;
+const tagInput = $('#editor-tags');
+const tagSuggest = $('#tag-suggest');
+
+const knownTags = () =>
+  [...new Set(tasks().flatMap((t) => t.tags))].sort((a, b) => tagMix(b) - tagMix(a) || a.localeCompare(b));
+
+function renderTagChips() {
+  $('#editor-tag-chips').replaceChildren(
+    ...editorTags.map((tag) =>
+      h(
+        'span',
+        { class: 'tag-chip', style: `--td-tag-mix: ${tagMix(tag)}%` },
+        tag,
+        h(
+          'button',
+          {
+            class: 'tag-chip__remove',
+            type: 'button',
+            'aria-label': `Remove ${tag}`,
+            onclick: (e) => {
+              e.stopPropagation();
+              editorTags = editorTags.filter((t) => t !== tag);
+              renderTagChips();
+              tagInput.focus();
+              if (tagSuggest.matches(':popover-open')) renderTagSuggest();
+            },
+          },
+          icon('close')
+        )
+      )
+    )
+  );
+  tagInput.placeholder = editorTags.length ? '' : 'Add tag';
+}
+
+function tagSuggestions() {
+  const query = normalizeTags([tagInput.value])[0] ?? '';
+  const pool = knownTags().filter((tag) => !editorTags.includes(tag));
+  const matches = query
+    ? pool
+        .filter((tag) => tag.includes(query))
+        .sort((a, b) => Number(!a.startsWith(query)) - Number(!b.startsWith(query)))
+    : pool;
+  const options = matches.map((tag) => ({ tag, create: false }));
+  if (query && !knownTags().includes(query) && !editorTags.includes(query)) options.push({ tag: query, create: true });
+  return options;
+}
+
+function renderTagSuggest() {
+  const options = tagSuggestions();
+  tagHighlight = Math.min(tagHighlight, Math.max(options.length - 1, 0));
+  tagSuggest.replaceChildren(
+    ...(options.length
+      ? options.map((option, i) =>
+          h(
+            'div',
+            {
+              class: `tag-menu__option${option.create ? ' tag-suggest__create' : ''}`,
+              id: `tag-option-${i}`,
+              role: 'option',
+              'aria-selected': String(i === tagHighlight && (tagNavigated || tagInput.value.trim() !== '')),
+              onpointerdown: (e) => e.preventDefault(),
+              onclick: () => {
+                commitTag(option.tag);
+                tagInput.focus();
+              },
+              onpointermove: () => {
+                if (tagHighlight !== i) {
+                  tagHighlight = i;
+                  renderTagSuggest();
+                }
+              },
+            },
+            option.create ? icon('add') : tagDot(option.tag),
+            option.create
+              ? h('span', { class: 'tag-menu__name' }, 'Create ', h('b', {}, option.tag))
+              : h('span', { class: 'tag-menu__name' }, option.tag)
+          )
+        )
+      : [h('p', { class: 'tag-suggest__empty' }, editorTags.length ? 'All your tags are on this task' : 'Type to create a tag')])
+  );
+  tagInput.setAttribute('aria-activedescendant', options.length ? `tag-option-${tagHighlight}` : '');
+  return options;
+}
+
+function openTagSuggest() {
+  const rect = $('#editor-tag-field').getBoundingClientRect();
+  tagSuggest.style.top = `${rect.bottom + 4}px`;
+  tagSuggest.style.left = `${rect.left}px`;
+  tagSuggest.style.right = 'auto';
+  tagSuggest.style.inlineSize = `${Math.max(rect.width, 200)}px`;
+  renderTagSuggest();
+  if (!tagSuggest.matches(':popover-open')) tagSuggest.showPopover();
+  tagInput.setAttribute('aria-expanded', 'true');
+}
+
+function closeTagSuggest() {
+  if (tagSuggest.matches(':popover-open')) tagSuggest.hidePopover();
+  tagInput.setAttribute('aria-expanded', 'false');
+  tagInput.removeAttribute('aria-activedescendant');
+}
+
+function commitTag(value) {
+  const [tag] = normalizeTags([value]);
+  tagInput.value = '';
+  tagHighlight = 0;
+  tagNavigated = false;
+  if (tag && !editorTags.includes(tag)) editorTags.push(tag);
+  renderTagChips();
+  if (tagSuggest.matches(':popover-open')) openTagSuggest();
+}
+
+$('#editor-tag-field').addEventListener('click', () => tagInput.focus());
+tagInput.addEventListener('focus', openTagSuggest);
+tagInput.addEventListener('blur', closeTagSuggest);
+tagInput.addEventListener('input', () => {
+  tagHighlight = 0;
+  tagNavigated = false;
+  if (tagInput.value.includes(',')) {
+    tagInput.value.split(',').slice(0, -1).forEach(commitTag);
+    tagInput.value = '';
+  }
+  openTagSuggest();
+});
+tagInput.addEventListener('keydown', (e) => {
+  const open = tagSuggest.matches(':popover-open');
+  const options = open ? tagSuggestions() : [];
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!open) return openTagSuggest();
+    if (!options.length) return;
+    tagHighlight = tagNavigated
+      ? (tagHighlight + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length
+      : e.key === 'ArrowDown'
+        ? 0
+        : options.length - 1;
+    tagNavigated = true;
+    renderTagSuggest();
+  } else if (e.key === 'Enter' && (tagInput.value.trim() || (open && tagNavigated && options.length))) {
+    e.preventDefault();
+    const pick = options[tagHighlight];
+    commitTag(pick ? pick.tag : tagInput.value);
+  } else if (e.key === 'Backspace' && !tagInput.value && editorTags.length) {
+    editorTags.pop();
+    renderTagChips();
+    if (open) renderTagSuggest();
+  } else if (e.key === 'Escape' && open) {
+    e.stopPropagation();
+    closeTagSuggest();
+  }
+});
 
 const columnMenu = $('#column-menu');
 
