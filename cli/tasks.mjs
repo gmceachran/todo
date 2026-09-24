@@ -345,6 +345,9 @@ async function run() {
       const journal = new GitHubStore({ repo: process.env.TODO_JOURNAL_REPO || 'gmceachran/journal', token: githubToken() });
       const files = ['Work Journal.md', 'Personal Journal.md'];
       const texts = await Promise.all(files.map((f) => journal.readText(f)));
+      if (texts.every((t) => t == null)) {
+        throw new Error(`GitHub found neither journal in ${journal.repoUrl.split('/repos/')[1]}. The token probably doesn't have access to that repo.`);
+      }
       const rows = files.map((file, i) => ({ file, text: texts[i] }));
       print(rows, rows.map((r) => `===== ${r.file} =====\n${r.text ?? '(missing)'}`).join('\n\n'));
       return;
