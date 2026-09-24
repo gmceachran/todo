@@ -1,6 +1,6 @@
 (() => {
-const SCHEMA_VERSION = 1;
-const STATUSES = ['open', 'done', 'suggested', 'dismissed'];
+const SCHEMA_VERSION = 2;
+const STATUSES = ['open', 'done'];
 const UNITS = ['day', 'week', 'month', 'year'];
 const WEEKDAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -8,7 +8,7 @@ const DAY_MS = 86400000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function emptyDoc() {
-  return { version: SCHEMA_VERSION, tasks: [] };
+  return { version: SCHEMA_VERSION, categories: [], tasks: [], suggested: {}, removed: {} };
 }
 
 // region dates
@@ -203,9 +203,9 @@ function describeRepeat(repeat) {
 
 // region tasks
 
-function makeId() {
+function makeId(prefix = 't') {
   const rand = Math.random().toString(36).slice(2, 8);
-  return `t_${Date.now().toString(36)}${rand}`;
+  return `${prefix}_${Date.now().toString(36)}${rand}`;
 }
 
 function cleanText(value) {
@@ -218,7 +218,7 @@ function normalizeSource(source) {
   const key = cleanText(source.key);
   if (!key) return null;
   const result = { key };
-  if (cleanText(source.url)) result.url = cleanText(source.url);
+  if (/^https?:\/\//i.test(cleanText(source.url))) result.url = cleanText(source.url);
   if (cleanText(source.label)) result.label = cleanText(source.label);
   return result;
 }
@@ -227,6 +227,36 @@ function normalizeDue(due) {
   if (due == null || due === '' || due === 'none') return null;
   if (!isDate(due)) throw new Error(`Invalid due date "${due}" (use YYYY-MM-DD)`);
   return due;
+}
+
+function normalizeTags(tags) {
+  const list = Array.isArray(tags) ? tags : typeof tags === 'string' ? tags.split(/[,\s]+/) : [];
+  const clean = list
+    .map((tag) =>
+      String(tag)
+        .trim()
+        .replace(/^#/, '')
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^\w-]/g, '')
+    )
+    .filter(Boolean);
+  return [...new Set(clean)];
+}
+
+function normalizeDoc(doc) {
+  const result = doc && typeof doc === 'object' ? doc : emptyDoc();
+  result.version = SCHEMA_VERSION;
+  if (!Array.isArray(result.categories)) result.categories = [];
+  if (!Array.isArray(result.tasks)) result.tasks = [];
+  if (!result.suggested || typeof result.suggested !== 'object') result.suggested = {};
+  if (!result.removed || typeof result.removed !== 'object') result.removed = {};
+  result.tasks = result.tasks.filter((t) => STATUSES.includes(t.status));
+  for (const task of result.tasks) {
+    if (!Array.isArray(task.tags)) task.tags = [];
+    if (task.category === undefined) task.category = null;
+  }
+  return result;
 }
 
 function findBySource(doc, key) {
@@ -240,9 +270,105 @@ function findTask(doc, ref) {
   return null;
 }
 
+function findCategory(doc, ref) {
+  if (!ref) return null;
+  const byId = doc.categories.find((c) => c.id === ref);
+  if (byId) return byId;
+  const name = String(ref).trim().toLowerCase();
+  if (!name) return null;
+  const simple = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+  return (
+    doc.categories.find((c) => c.name.toLowerCase() === name) ||
+    doc.categories.find((c) => simple(c.name) === simple(name)) ||
+    doc.categories.find((c) => simple(name).includes(simple(c.name)) || simple(c.name).includes(simple(name))) ||
+    null
+  );
+}
+
+function resolveCategory(doc, input) {
+  if (input.category === null) return null;
+  return findCategory(doc, input.category ?? input.categoryName)?.id ?? null;
+}
+
+function applyCategoryOp(doc, op, now) {
+  switch (op.type) {
+    case 'addCategory': {
+      const input = op.category || {};
+      if (input.id && doc.categories.some((c) => c.id === input.id)) return { skipped: 'exists' };
+      const name = cleanText(input.name);
+      if (!name) throw new Error('A category needs a name');
+      const existing = doc.categories.find((c) => c.name.toLowerCase() === name.toLowerCase());
+      if (existing) return { skipped: 'duplicate', category: existing };
+      const category = { id: input.id || makeId('c'), name, created: now };
+      doc.categories.push(category);
+      return { category };
+    }
+    case 'renameCategory': {
+      const category = doc.categories.find((c) => c.id === op.id);
+      if (!category) return { skipped: 'missing' };
+      const name = cleanText(op.name);
+      if (!name) throw new Error('A category needs a name');
+      category.name = name;
+      return { category };
+    }
+    case 'moveCategory': {
+      const from = doc.categories.findIndex((c) => c.id === op.id);
+      if (from === -1) return { skipped: 'missing' };
+      const [category] = doc.categories.splice(from, 1);
+      const to = Math.max(0, Math.min(doc.categories.length, Number(op.index) || 0));
+      doc.categories.splice(to, 0, category);
+      return { category };
+    }
+    case 'deleteCategory': {
+      const index = doc.categories.findIndex((c) => c.id === op.id);
+      if (index === -1) return { skipped: 'missing' };
+      const [category] = doc.categories.splice(index, 1);
+      const moveTo = op.moveTo && doc.categories.some((c) => c.id === op.moveTo) ? op.moveTo : null;
+      const affected = doc.tasks.filter((t) => t.category === category.id);
+      if (op.deleteTasks) {
+        for (const task of affected) removeTask(doc, task, now);
+      } else {
+        for (const task of affected) {
+          task.category = moveTo;
+          task.updated = now;
+        }
+      }
+      return { category, tasks: affected.length };
+    }
+    case 'restoreCategory': {
+      if (!doc.categories.some((c) => c.id === op.category.id)) {
+        doc.categories.splice(Math.min(op.index ?? doc.categories.length, doc.categories.length), 0, op.category);
+      }
+      for (const snapshot of op.tasks || []) {
+        const at = doc.tasks.findIndex((t) => t.id === snapshot.id);
+        if (at === -1) doc.tasks.push(snapshot);
+        else doc.tasks[at] = snapshot;
+        if (snapshot.source) delete doc.removed[snapshot.source.key];
+      }
+      return { category: op.category };
+    }
+    default:
+      return null;
+  }
+}
+
+function removeTask(doc, task, now) {
+  doc.tasks.splice(doc.tasks.indexOf(task), 1);
+  if (task.source) doc.removed[task.source.key] = now.slice(0, 10);
+}
+
 function applyOp(doc, op, ctx = {}) {
   const now = op.at || ctx.now || new Date().toISOString();
   const today = op.today || ctx.today || localToday();
+
+  const categoryResult = applyCategoryOp(doc, op, now);
+  if (categoryResult) return categoryResult;
+
+  if (op.type === 'markSuggested') {
+    for (const key of op.keys || []) if (cleanText(key)) doc.suggested[cleanText(key)] = today;
+    pruneLog(doc.suggested, today);
+    return { marked: (op.keys || []).length };
+  }
 
   if (op.type === 'add') {
     const input = op.task || {};
@@ -251,6 +377,8 @@ function applyOp(doc, op, ctx = {}) {
     if (source) {
       const existing = findBySource(doc, source.key);
       if (existing) return { skipped: 'duplicate', task: existing };
+      if (doc.removed[source.key] && !op.revive) return { skipped: 'removed' };
+      delete doc.removed[source.key];
     }
     const title = cleanText(input.title);
     if (!title) throw new Error('A task needs a title');
@@ -259,7 +387,17 @@ function applyOp(doc, op, ctx = {}) {
     let due = normalizeDue(input.due);
     const repeat = normalizeRepeat(input.repeat, due);
     if (repeat && !due) due = today;
-    const task = { id: input.id || makeId(), title, status, due, repeat, created: now, updated: now };
+    const task = {
+      id: input.id || makeId(),
+      title,
+      status,
+      category: resolveCategory(doc, input),
+      tags: normalizeTags(input.tags),
+      due,
+      repeat,
+      created: now,
+      updated: now,
+    };
     const notes = cleanText(input.notes);
     if (notes) task.notes = notes;
     if (source) task.source = source;
@@ -273,6 +411,7 @@ function applyOp(doc, op, ctx = {}) {
     const task = { ...op.task, updated: now };
     if (index === -1) doc.tasks.push(task);
     else doc.tasks[index] = task;
+    if (task.source) delete doc.removed[task.source.key];
     return { task };
   }
 
@@ -292,6 +431,8 @@ function applyOp(doc, op, ctx = {}) {
         if (notes) task.notes = notes;
         else delete task.notes;
       }
+      if ('category' in patch || 'categoryName' in patch) task.category = resolveCategory(doc, patch);
+      if ('tags' in patch) task.tags = normalizeTags(patch.tags);
       if ('due' in patch) task.due = normalizeDue(patch.due);
       if ('repeat' in patch) task.repeat = normalizeRepeat(patch.repeat, task.due);
       if (task.repeat && !task.due) task.due = today;
@@ -330,16 +471,8 @@ function applyOp(doc, op, ctx = {}) {
       }
       break;
     }
-    case 'approve':
-      if (task.status !== 'suggested') return { skipped: 'not-suggested', task };
-      task.status = 'open';
-      break;
-    case 'dismiss':
-      if (task.status !== 'suggested') return { skipped: 'not-suggested', task };
-      task.status = 'dismissed';
-      break;
     case 'delete':
-      doc.tasks.splice(doc.tasks.indexOf(task), 1);
+      removeTask(doc, task, now);
       return { task, deleted: true };
     default:
       throw new Error(`Unknown operation "${op.type}"`);
@@ -353,19 +486,54 @@ function applyOps(doc, ops, ctx) {
 }
 
 function describeOp(op, doc) {
+  if (op.type.endsWith('Category')) {
+    const name = op.category?.name || op.name || doc.categories?.find((c) => c.id === op.id)?.name || op.id;
+    return `${op.type} "${name}"`;
+  }
+  if (op.type === 'markSuggested') return `markSuggested ${(op.keys || []).length}`;
   const task = op.task?.title ? op.task : findTask(doc, op);
   const title = task?.title ? `"${task.title}"` : op.id || op.source || '';
   return `${op.type} ${title}`.trim();
 }
 
+function pruneLog(log, today, days = 120) {
+  const cutoff = addDays(today, -days);
+  for (const [key, date] of Object.entries(log)) if (date < cutoff) delete log[key];
+  return log;
+}
+
 // region agenda
+
+function encodeImport(tasks) {
+  const bytes = new TextEncoder().encode(JSON.stringify({ v: 1, tasks }));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeImport(payload) {
+  const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+  const binary = atob(base64 + '='.repeat((4 - (base64.length % 4)) % 4));
+  const data = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, (c) => c.charCodeAt(0))));
+  if (data?.v !== 1 || !Array.isArray(data.tasks)) throw new Error('Unrecognized import link');
+  return data.tasks
+    .filter((t) => t && typeof t.title === 'string' && t.title.trim())
+    .slice(0, 50)
+    .map((t) => ({
+      title: t.title,
+      notes: typeof t.notes === 'string' ? t.notes : undefined,
+      categoryName: typeof t.category === 'string' ? t.category : undefined,
+      tags: Array.isArray(t.tags) ? t.tags : [],
+      due: typeof t.due === 'string' && isDate(t.due) ? t.due : null,
+      source: t.source && typeof t.source.key === 'string' ? t.source : undefined,
+    }));
+}
 
 function agenda(doc, today, { upcomingDays = 7, timeZone } = {}) {
   const horizon = addDays(today, upcomingDays);
-  const groups = { suggested: [], overdue: [], today: [], upcoming: [], later: [], someday: [], doneToday: [] };
+  const groups = { overdue: [], today: [], upcoming: [], later: [], someday: [], doneToday: [] };
   for (const task of doc.tasks) {
-    if (task.status === 'suggested') groups.suggested.push(task);
-    else if (task.status === 'done') {
+    if (task.status === 'done') {
       if (task.completed && localDateOf(task.completed, timeZone) === today) groups.doneToday.push(task);
     } else if (task.status === 'open') {
       if (task.repeat && task.lastDone && localDateOf(task.lastDone, timeZone) === today) groups.doneToday.push(task);
@@ -380,7 +548,6 @@ function agenda(doc, today, { upcomingDays = 7, timeZone } = {}) {
   const byCreated = (a, b) => a.created.localeCompare(b.created);
   for (const key of ['overdue', 'today', 'upcoming', 'later']) groups[key].sort(byDue);
   groups.someday.sort(byCreated);
-  groups.suggested.sort(byCreated);
   return groups;
 }
 
@@ -547,23 +714,7 @@ function counts() {
   };
 }
 
-const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-const inWords = (n) => NUMBER_WORDS[n] ?? String(n);
-const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
-
-function deck() {
-  const { due, overdue } = counts();
-  const done = tasks.filter(doneToday).length;
-  const parts = [due ? `${inWords(due)} due today` : 'nothing due today'];
-  if (overdue) parts.push(h('em', {}, `${inWords(overdue)} overdue`));
-  if (done) parts.push(`${inWords(done)} already done`);
-  parts[0] = capitalize(parts[0]);
-  const nodes = parts.flatMap((part, i) => (i === 0 ? [part] : [i === parts.length - 1 ? ' and ' : ', ', part]));
-  return [...nodes, '.'];
-}
-
 function renderHeader() {
-  $('#deck').replaceChildren(...deck());
   $('#dateline').textContent = `Week ${isoWeek(today)} · ${today.slice(0, 4)}`;
   $('#crumbs').textContent = ['Tasks', 'Board', filterNames[ui.filter] + (ui.tag ? ` #${ui.tag}` : '')].join(' / ');
 
@@ -790,11 +941,23 @@ function renderColumn(c) {
       { class: 'board-column__header' },
       h('h2', { class: 'board-column__name', title: c.name }, c.name),
       h('span', { class: 'board-column__count', 'aria-label': `${open.length} open` }, String(open.length)),
-      h(
-        'span',
-        { class: 'board-column__sub label' },
-        done.length ? `${done.length} done today` : open.length ? 'Open' : 'Clear'
-      )
+      done.length
+        ? h(
+            'button',
+            {
+              class: 'board-column__sub board-column__done-toggle label',
+              type: 'button',
+              'aria-expanded': String(showingDone),
+              onclick: (e) => {
+                e.stopPropagation();
+                if (showingDone) ui.showDone.delete(c.id);
+                else ui.showDone.add(c.id);
+                render();
+              },
+            },
+            showingDone ? 'Hide done' : `${done.length} done today`
+          )
+        : h('span', { class: 'board-column__sub label' }, open.length ? 'Open' : 'Clear')
     ),
     h(
       'div',
@@ -813,22 +976,6 @@ function renderColumn(c) {
           { class: 'quiet-button', type: 'button', onclick: () => startAdding(c.id) },
           icon('add'),
           'Add task'
-        ),
-      done.length > 0 &&
-        h(
-          'button',
-          {
-            class: 'quiet-button',
-            type: 'button',
-            'aria-expanded': String(showingDone),
-            onclick: () => {
-              if (showingDone) ui.showDone.delete(c.id);
-              else ui.showDone.add(c.id);
-              render();
-            },
-          },
-          icon(showingDone ? 'expand_less' : 'check'),
-          showingDone ? 'Hide done' : `${done.length} done today`
         )
     )
   );

@@ -163,23 +163,7 @@ function counts() {
   };
 }
 
-const NUMBER_WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten'];
-const inWords = (n) => NUMBER_WORDS[n] ?? String(n);
-const capitalize = (text) => text.charAt(0).toUpperCase() + text.slice(1);
-
-function deck() {
-  const { due, overdue } = counts();
-  const done = tasks.filter(doneToday).length;
-  const parts = [due ? `${inWords(due)} due today` : 'nothing due today'];
-  if (overdue) parts.push(h('em', {}, `${inWords(overdue)} overdue`));
-  if (done) parts.push(`${inWords(done)} already done`);
-  parts[0] = capitalize(parts[0]);
-  const nodes = parts.flatMap((part, i) => (i === 0 ? [part] : [i === parts.length - 1 ? ' and ' : ', ', part]));
-  return [...nodes, '.'];
-}
-
 function renderHeader() {
-  $('#deck').replaceChildren(...deck());
   $('#dateline').textContent = `Week ${isoWeek(today)} · ${today.slice(0, 4)}`;
   $('#crumbs').textContent = ['Tasks', 'Board', filterNames[ui.filter] + (ui.tag ? ` #${ui.tag}` : '')].join(' / ');
 
@@ -406,11 +390,23 @@ function renderColumn(c) {
       { class: 'board-column__header' },
       h('h2', { class: 'board-column__name', title: c.name }, c.name),
       h('span', { class: 'board-column__count', 'aria-label': `${open.length} open` }, String(open.length)),
-      h(
-        'span',
-        { class: 'board-column__sub label' },
-        done.length ? `${done.length} done today` : open.length ? 'Open' : 'Clear'
-      )
+      done.length
+        ? h(
+            'button',
+            {
+              class: 'board-column__sub board-column__done-toggle label',
+              type: 'button',
+              'aria-expanded': String(showingDone),
+              onclick: (e) => {
+                e.stopPropagation();
+                if (showingDone) ui.showDone.delete(c.id);
+                else ui.showDone.add(c.id);
+                render();
+              },
+            },
+            showingDone ? 'Hide done' : `${done.length} done today`
+          )
+        : h('span', { class: 'board-column__sub label' }, open.length ? 'Open' : 'Clear')
     ),
     h(
       'div',
@@ -429,22 +425,6 @@ function renderColumn(c) {
           { class: 'quiet-button', type: 'button', onclick: () => startAdding(c.id) },
           icon('add'),
           'Add task'
-        ),
-      done.length > 0 &&
-        h(
-          'button',
-          {
-            class: 'quiet-button',
-            type: 'button',
-            'aria-expanded': String(showingDone),
-            onclick: () => {
-              if (showingDone) ui.showDone.delete(c.id);
-              else ui.showDone.add(c.id);
-              render();
-            },
-          },
-          icon(showingDone ? 'expand_less' : 'check'),
-          showingDone ? 'Hide done' : `${done.length} done today`
         )
     )
   );
