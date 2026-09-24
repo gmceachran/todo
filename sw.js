@@ -1,4 +1,4 @@
-const VERSION = 'todo-v2';
+const VERSION = 'todo-v3';
 const SHELL = [
   './',
   './index.html',
