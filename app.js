@@ -165,7 +165,8 @@ function noteLinks(notes = '') {
   return links;
 }
 
-const sourceIcon = (key) => (key.startsWith('linear') ? 'change_history' : key.startsWith('slack') ? 'tag' : 'mail');
+const SOURCE_ICONS = { linear: 'change_history', slack: 'tag', gmail: 'mail' };
+const sourceIcon = (key) => SOURCE_ICONS[key.split(':')[0]] ?? 'link';
 
 const tasks = () => state.doc.tasks;
 const categories = () => state.doc.categories;
