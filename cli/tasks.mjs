@@ -27,6 +27,7 @@ Writing:
 
 Brief helpers:
   link <file|->                Print an app link that adds a JSON array of tasks when opened
+  journal                      Print the work and personal journals ($TODO_JOURNAL_REPO or gmceachran/journal)
 
 Task fields:
   --due YYYY-MM-DD|none   --repeat "weekdays"|"every 2 weeks"|"every mon, thu"|none
@@ -338,6 +339,14 @@ async function run() {
       if (!Array.isArray(tasks) || !tasks.length) throw new Error('link expects a non-empty JSON array of tasks');
       const url = `${appUrl}#import=${encodeImport(tasks)}`;
       print({ url, count: tasks.length }, url);
+      return;
+    }
+    case 'journal': {
+      const journal = new GitHubStore({ repo: process.env.TODO_JOURNAL_REPO || 'gmceachran/journal', token: githubToken() });
+      const files = ['Work Journal.md', 'Personal Journal.md'];
+      const texts = await Promise.all(files.map((f) => journal.readText(f)));
+      const rows = files.map((file, i) => ({ file, text: texts[i] }));
+      print(rows, rows.map((r) => `===== ${r.file} =====\n${r.text ?? '(missing)'}`).join('\n\n'));
       return;
     }
     default:

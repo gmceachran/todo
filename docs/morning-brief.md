@@ -20,10 +20,7 @@ Sections:
 
 JOURNAL
 
-My journals are two Markdown files in the private GitHub repo gmceachran/journal. Read them only like this, with the same GITHUB_TOKEN as the task board:
-  curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/gmceachran/journal/contents/Work%20Journal.md"
-  curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/gmceachran/journal/contents/Personal%20Journal.md"
-If a read fails with a message that GitHub access to the repository is not enabled for this session, request access to gmceachran/journal with the add_repo tool (read access is enough), then retry both reads once.
+My journals are two Markdown files in the private GitHub repo gmceachran/journal. Read them only with `tasks journal`, using the tasks CLI and GITHUB_TOKEN set up under TASK BOARD (do that setup first). It prints Work Journal.md, then Personal Journal.md.
 Each entry starts with a heading like "## Wed 09/23/26" (MM/DD/YY). Skip placeholder headings such as "## Day MM/DD/YY" and "## Template". Entries are not always in order, so sort by date. "Recent" means entries from the last 7 days; if there are none, the 3 most recent from each file. Read the older entries too.
 
 Write the On my mind section, addressed to me as "you", with up to three subsections. Include a subsection only if I have recent thoughts that belong in it; if none do, leave the whole section out.
@@ -37,7 +34,7 @@ If the journals can't be read, write one plain line saying so and the error. Jou
 
 TASK BOARD
 
-My to-do list is tasks.json in the private GitHub repo gmceachran/todo-data. Read and change it only with the tasks CLI below. Never call the GitHub API another way (except the two journal reads under JOURNAL), never touch any other repo, and never print the token.
+My to-do list is tasks.json in the private GitHub repo gmceachran/todo-data. Read and change it, and read the journals, only with the tasks CLI below. Never call the GitHub API another way, never touch any repo other than these two, and never print the token.
 
 Setup, in the cloud shell (each shell call is fresh, so repeat the export in every call that runs the CLI):
   export GITHUB_TOKEN="PASTE_TOKEN_HERE" TODO_TZ=America/New_York

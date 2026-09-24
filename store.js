@@ -70,6 +70,17 @@ export class GitHubStore {
     return { doc, sha: body.sha };
   }
 
+  async readText(path) {
+    const url = `${this.repoUrl}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
+    const res = await this.fetch(`${url}?ref=${encodeURIComponent(this.branch)}`, {
+      headers: { ...this.headers(), Accept: 'application/vnd.github.raw' },
+      cache: 'no-store',
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) await this.fail(res);
+    return res.text();
+  }
+
   async save(doc, sha, message) {
     const body = {
       message,
