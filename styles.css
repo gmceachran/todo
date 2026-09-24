@@ -692,7 +692,11 @@ button.ghost-select {
     padding: 0;
     gap: 0;
     overflow-y: auto;
-    scrollbar-width: thin;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
   }
 
   .board-column__empty {
