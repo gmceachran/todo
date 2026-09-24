@@ -23,6 +23,7 @@ JOURNAL
 My journals are two Markdown files in the private GitHub repo gmceachran/journal. Read them only like this, with the same GITHUB_TOKEN as the task board:
   curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/gmceachran/journal/contents/Work%20Journal.md"
   curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" "https://api.github.com/repos/gmceachran/journal/contents/Personal%20Journal.md"
+If a read fails with a message that GitHub access to the repository is not enabled for this session, request access to gmceachran/journal with the add_repo tool (read access is enough), then retry both reads once.
 Each entry starts with a heading like "## Wed 09/23/26" (MM/DD/YY). Skip placeholder headings such as "## Day MM/DD/YY" and "## Template". Entries are not always in order, so sort by date. "Recent" means entries from the last 7 days; if there are none, the 3 most recent from each file. Read the older entries too.
 
 Write the On my mind section, addressed to me as "you", with up to three subsections. Include a subsection only if I have recent thoughts that belong in it; if none do, leave the whole section out.
