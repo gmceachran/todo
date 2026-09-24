@@ -146,6 +146,25 @@ const TAG_STOPS = [0, 33, 67, 100];
 const tagMix = (tag) =>
   TAG_STOPS[([...tag].reduce((hash, c) => ((hash << 5) + hash + c.charCodeAt(0)) >>> 0, 5381) >>> 3) % TAG_STOPS.length];
 
+const URL_PATTERN = /https?:\/\/[^\s<>"']+/g;
+
+function noteLinks(notes = '') {
+  const links = [];
+  for (const line of notes.split('\n')) {
+    for (const match of line.matchAll(URL_PATTERN)) {
+      let host;
+      try {
+        host = new URL(match[0]).hostname.replace(/^www\./, '');
+      } catch {
+        continue;
+      }
+      const label = line.slice(0, match.index).replace(/[\s:–-]+$/, '').trim();
+      links.push({ url: match[0], label: label || host, host });
+    }
+  }
+  return links;
+}
+
 const sourceIcon = (key) => (key.startsWith('linear') ? 'change_history' : key.startsWith('slack') ? 'tag' : 'mail');
 
 const tasks = () => state.doc.tasks;
@@ -393,6 +412,7 @@ function renderTabs(list) {
 
 function renderCard(t, { done = false } = {}) {
   const due = dueInfo(t.due);
+  const linkCount = noteLinks(t.notes).length;
   const meta = h(
     'div',
     { class: 'task-card__meta' },
@@ -407,6 +427,13 @@ function renderCard(t, { done = false } = {}) {
         due.label
       ),
     t.repeat && h('span', { class: 'task-card__meta-item' }, icon('repeat'), describeRepeat(t.repeat)),
+    linkCount > 0 &&
+      h(
+        'span',
+        { class: 'task-card__meta-item', title: `${plural(linkCount, 'link')} in notes` },
+        icon('link'),
+        String(linkCount)
+      ),
     t.source &&
       h(
         t.source.url ? 'a' : 'span',
@@ -842,6 +869,7 @@ function openEditor(id) {
   const form = $('#editor-form');
   form.elements.title.value = t.title;
   form.elements.notes.value = t.notes || '';
+  renderEditorLinks(t.notes);
   form.elements.due.value = t.due || '';
   form.elements.tags.value = t.tags.join(', ');
   form.elements.category.replaceChildren(...categoryOptions(columnOf(t)));
@@ -865,6 +893,29 @@ function openEditor(id) {
   showModal('#editor');
   setTimeout(() => form.elements.title.focus(), 50);
 }
+
+function renderEditorLinks(notes) {
+  const links = noteLinks(notes);
+  const list = $('#editor-links');
+  list.hidden = !links.length;
+  list.replaceChildren(
+    ...links.map((link) =>
+      h(
+        'li',
+        {},
+        h(
+          'a',
+          { class: 'editor__link', href: link.url, target: '_blank', rel: 'noopener' },
+          icon('arrow_outward'),
+          h('span', { class: 'editor__link-label' }, link.label),
+          h('span', { class: 'editor__link-host' }, link.host)
+        )
+      )
+    )
+  );
+}
+
+$('#editor-notes').addEventListener('input', (e) => renderEditorLinks(e.target.value));
 
 function closeEditor() {
   hideModal('#editor');
