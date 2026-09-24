@@ -11,6 +11,7 @@ Reading:
   agenda                       Overdue, today, next 7 days, later, someday, done today
   list [--status open|done|all] [--category NAME]
   categories                   Category names and ids, in board order
+  tags                         Tags in use, most used first
   has <source-key>             Exit 0 if a task with that source key exists (or was deleted)
   was-suggested <source-key>   Exit 0 if the brief already suggested that key
 
@@ -244,6 +245,14 @@ async function run() {
         open: doc.tasks.filter((t) => t.category === c.id && t.status === 'open').length,
       }));
       print(rows, rows.map((c) => `  ${c.id}  ${c.name}  (${c.open} open)`).join('\n') || 'No categories yet.');
+      return;
+    }
+    case 'tags': {
+      const { doc } = await getStore().load();
+      const counts = new Map();
+      for (const task of doc.tasks) for (const tag of task.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      const rows = [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([tag, count]) => ({ tag, count }));
+      print(rows, rows.map((r) => `  #${r.tag}  (${r.count})`).join('\n') || 'No tags yet.');
       return;
     }
     case 'has': {

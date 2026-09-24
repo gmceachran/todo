@@ -24,6 +24,7 @@ Setup, in the cloud shell (each shell call is fresh, so repeat the export in eve
   export GITHUB_TOKEN="PASTE_TOKEN_HERE" TODO_TZ=America/New_York
   git clone --depth 1 https://github.com/gmceachran/todo.git "$HOME/todo" || { mkdir -p "$HOME/todo/cli" && for f in core.js store.js package.json cli/tasks.mjs; do curl -fsSL "https://gmceachran.github.io/todo/$f" -o "$HOME/todo/$f"; done; }
 The CLI is `node "$HOME/todo/cli/tasks.mjs" --by brief <command>`; below, `tasks` means that full command. Check it with `tasks categories`.
+Every task this run adds or suggests gets a due date and one or two tags, guessed when the source doesn't give them. Due: a date the source states wins; otherwise a plausible working day (today or the next working day for quick replies and small asks, within the week for normal work, the following week for bigger pieces), never a weekend. Tags: reuse ones from `tasks tags` when any fits (e.g. quick, reply, review, deep-work); make a new short lowercase tag only when none does.
 If setup or any CLI call fails (no network, bad or expired token, node missing), carry on with the rest of the brief and put one plain line at the top of Today's tasks saying the board couldn't be reached and the error.
 
 Step 1: sync Linear onto the board (no approval needed).
@@ -31,8 +32,8 @@ Step 1: sync Linear onto the board (no approval needed).
   b. Run `tasks list --status all --json` to see what is already on the board.
   c. Build one JSON array and pipe it to `tasks apply -`:
      - For each open Linear issue with no board task whose source.key is "linear:<IDENTIFIER>":
-       {"op":"add","title":"<issue title>","source":{"key":"linear:<IDENTIFIER>","url":"<issue url>","label":"<IDENTIFIER>"},"due":"<YYYY-MM-DD or null>","category":"<Linear project name, else team name>"}
-       The CLI skips issues already on the board or that I deleted, and matches the category name loosely; anything unmatched lands in Uncategorized. Don't add tags or notes.
+       {"op":"add","title":"<issue title>","source":{"key":"linear:<IDENTIFIER>","url":"<issue url>","label":"<IDENTIFIER>"},"due":"<Linear due date, else your guess>","tags":["<tag>"],"category":"<Linear project name, else team name>"}
+       The CLI skips issues already on the board or that I deleted, and matches the category name loosely; anything unmatched lands in Uncategorized. Don't add notes.
      - For each open board task with a linear: source whose issue is now completed or canceled: {"op":"complete","source":"linear:<IDENTIFIER>"}
      Skip the call if the array would be empty.
   d. Note in one line at the end of Today's tasks how many issues were added and closed.
@@ -43,9 +44,9 @@ Step 2: the Today's tasks section.
 Step 3: suggested tasks from Slack and Gmail.
   a. Look at the last ~24 hours for direct asks of me: Slack DMs and @mentions, and emails sent to me (not just CC'd) that contain a request, a question I owe an answer to, or a deadline. Skip newsletters, notifications, automated mail, and threads I already replied to.
   b. Give each candidate a key: Slack "slack:<channel id>/<message ts>", Gmail "gmail:<message id>". Drop any where `tasks was-suggested <key>` or `tasks has <key>` exits 0.
-  c. Keep at most 8. For each, write a short imperative title (e.g. "Send Sam the demo deck"), a one-line reason, the source link, a due date only if the message states one, and a category from `tasks categories` if one clearly fits.
-  d. Render the Suggested tasks section as an interactive checklist. One row per suggestion: a checkbox (unchecked by default), the title, the reason and source link, and a category <select> whose options are every board category plus "Uncategorized", preselected to your suggestion. Below the rows, a link styled as a button, "Add selected to my list", that opens in a new tab (target="_blank", rel="noopener"). Keep its href current whenever a checkbox or select changes, and show it disabled when nothing is checked. Build the href in the page like this:
-       const tasks = selectedRows.map((row) => ({ title: row.title, category: row.category /* name, or null for Uncategorized */, tags: [], due: row.due /* YYYY-MM-DD or null */, source: { key: row.key, url: row.url, label: row.isSlack ? 'Slack' : 'Email' } }));
+  c. Keep at most 8. For each, write a short imperative title (e.g. "Send Sam the demo deck"), a one-line reason, the source link, a due date and tags (guessed if the message doesn't give them), and a category from `tasks categories` if one clearly fits.
+  d. Render the Suggested tasks section as an interactive checklist. One row per suggestion: a checkbox (unchecked by default), the title, its due date and tags, the reason and source link, and a category <select> whose options are every board category plus "Uncategorized", preselected to your suggestion. Below the rows, a link styled as a button, "Add selected to my list", that opens in a new tab (target="_blank", rel="noopener"). Keep its href current whenever a checkbox or select changes, and show it disabled when nothing is checked. Build the href in the page like this:
+       const tasks = selectedRows.map((row) => ({ title: row.title, category: row.category /* name, or null for Uncategorized */, tags: row.tags, due: row.due /* YYYY-MM-DD */, source: { key: row.key, url: row.url, label: row.isSlack ? 'Slack' : 'Email' } }));
        const bytes = new TextEncoder().encode(JSON.stringify({ v: 1, tasks }));
        const payload = btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join('')).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
        link.href = 'https://gmceachran.github.io/todo/#import=' + payload;
