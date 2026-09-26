@@ -154,7 +154,6 @@
   }
 
   .masthead__dateline {
-    margin-inline-start: auto;
     padding-block: var(--op-space-3x-small);
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
