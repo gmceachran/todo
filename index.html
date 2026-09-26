@@ -31,21 +31,9 @@
           Todo
         </h1>
         <div class="masthead__end">
-          <div class="tag-menu">
-            <button
-              id="tag-menu-button"
-              class="ghost-select"
-              type="button"
-              popovertarget="tag-menu-list"
-              aria-haspopup="listbox"
-              aria-expanded="false"
-            >
-              <span id="tag-menu-icon" class="tag-menu__lead"></span>
-              <span id="tag-menu-label" class="ghost-select__label">Tags</span>
-              <i class="ph ph-caret-down icon" aria-hidden="true"></i>
-            </button>
-            <div id="tag-menu-list" class="tag-menu__list" popover role="listbox" aria-label="Filter by tag"></div>
-          </div>
+          <button id="sync-status" class="sync-status label" type="button" data-state="idle" title="Sync now">
+            <i aria-hidden="true"></i><span id="sync-label">Synced</span>
+          </button>
           <button id="open-settings" class="quiet-button quiet-button--icon" type="button" aria-label="Settings">
             <i class="ph ph-gear-six icon" aria-hidden="true"></i>
           </button>
@@ -65,9 +53,21 @@
           <input class="view-tabs__input" type="radio" name="filter" id="filter-overdue" value="overdue" />
           <label class="view-tabs__label" for="filter-overdue">Overdue</label>
         </div>
-        <button id="sync-status" class="workspace__status" type="button" data-state="idle" title="Sync now">
-          <i aria-hidden="true"></i><span id="sync-label">Synced</span>
-        </button>
+        <div class="tag-menu">
+          <button
+            id="tag-menu-button"
+            class="ghost-select"
+            type="button"
+            popovertarget="tag-menu-list"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+          >
+            <span id="tag-menu-icon" class="tag-menu__lead"></span>
+            <span id="tag-menu-label" class="ghost-select__label">Tags</span>
+            <i class="ph ph-caret-down icon" aria-hidden="true"></i>
+          </button>
+          <div id="tag-menu-list" class="tag-menu__list" popover role="listbox" aria-label="Filter by tag"></div>
+        </div>
       </div>
       <nav id="category-tabs" class="category-tabs" aria-label="Categories"></nav>
       <main id="board" class="board" aria-label="Task board"></main>
