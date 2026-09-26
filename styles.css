@@ -449,21 +449,6 @@ button.ghost-select {
   font-weight: var(--op-font-weight-medium);
   letter-spacing: var(--td-label-tracking);
   text-transform: uppercase;
-
-  .panel-bar__lights {
-    display: inline-flex;
-    gap: var(--op-space-3x-small);
-
-    i {
-      inline-size: calc(1.75 * var(--op-size-unit));
-      block-size: calc(1.75 * var(--op-size-unit));
-      background-color: var(--td-line-strong);
-    }
-
-    i:first-child {
-      background-color: var(--td-accent);
-    }
-  }
 }
 
 .workspace {
@@ -1534,10 +1519,6 @@ button.ghost-select {
     flex-wrap: wrap;
     gap: var(--op-space-small);
     padding-inline: var(--op-space-small);
-
-    .panel-bar__lights {
-      display: none;
-    }
   }
 
   .category-tabs {
