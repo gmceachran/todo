@@ -318,20 +318,16 @@ function renderSync() {
 }
 
 function renderHeader() {
-  $('#dateline').textContent = `Week ${isoWeek(today)} · ${today.slice(0, 4)}`;
+  $('#dateline').textContent = [
+    new Intl.DateTimeFormat('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' }).format(utc(today)),
+    `Week ${isoWeek(today)}`,
+    today.slice(0, 4),
+  ].join(' · ');
   $('#crumbs').textContent = [
     'Tasks',
     'Board',
     { all: 'All', today: 'Today', week: 'This week', overdue: 'Overdue' }[ui.filter] + (ui.tag ? ` #${ui.tag}` : ''),
   ].join(' / ');
-  $('#today-label').replaceChildren(
-    new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(utc(today)),
-    h(
-      'span',
-      { class: 'masthead__date' },
-      new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' }).format(utc(today))
-    )
-  );
   document.title = `${counts().due ? `(${counts().due}) ` : ''}Todo`;
   renderTagMenu();
 }

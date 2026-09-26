@@ -23,7 +23,11 @@
   <body class="app">
     <header class="masthead">
       <div class="masthead__lede">
-        <h1 id="today-label" class="masthead__title"></h1>
+        <h1 class="masthead__title">
+          <img class="masthead__logo" src="icons/icon.svg" alt="" />
+          Todo
+        </h1>
+        <span id="dateline" class="masthead__dateline label"></span>
       </div>
 
       <div class="masthead__toolbar">
@@ -39,7 +43,6 @@
         </div>
 
         <div class="masthead__end">
-          <span id="dateline" class="masthead__dateline label"></span>
           <div class="tag-menu">
             <button
               id="tag-menu-button"
