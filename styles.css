@@ -462,6 +462,10 @@ button.ghost-select {
   background-size: var(--td-grid) var(--td-grid);
   box-shadow: var(--op-border-all) var(--td-line-strong), var(--op-shadow-x-small);
 
+  .panel-bar {
+    padding-inline: var(--op-space-large);
+  }
+
   .workspace__status {
     display: inline-flex;
     align-items: center;
@@ -1518,7 +1522,7 @@ button.ghost-select {
   .workspace .panel-bar {
     flex-wrap: wrap;
     gap: var(--op-space-small);
-    padding-inline: var(--op-space-small);
+    padding-inline: var(--op-space-medium);
   }
 
   .category-tabs {
