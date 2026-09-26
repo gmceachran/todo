@@ -1135,7 +1135,8 @@ button.ghost-select {
     flex: 1;
     flex-direction: column;
     min-inline-size: 0;
-    margin: 0;
+    max-inline-size: calc(160 * var(--op-size-unit));
+    margin: 0 0 0 auto;
     border-radius: var(--op-radius-small);
     background-color: var(--td-panel);
     box-shadow: var(--op-border-all) var(--td-panel-line);
