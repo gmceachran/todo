@@ -118,8 +118,6 @@
   margin: max(var(--op-space-large), env(safe-area-inset-top)) var(--op-space-large) 0;
   padding: var(--op-space-medium) var(--op-space-medium) 0;
   background-color: var(--td-page);
-  background-image: radial-gradient(circle, var(--td-dot) var(--op-border-width), transparent calc(var(--op-border-width) * 1.5));
-  background-size: var(--td-grid) var(--td-grid);
   box-shadow: var(--op-border-all) var(--td-line-strong), var(--op-shadow-x-small);
 
   .view-tabs .view-tabs__label:hover,
