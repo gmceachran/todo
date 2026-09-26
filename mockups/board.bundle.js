@@ -1034,11 +1034,6 @@ function renderHeader() {
     `Week ${isoWeek(today)}`,
     today.slice(0, 4),
   ].join(' · ');
-  $('#crumbs').textContent = [
-    'Tasks',
-    'Board',
-    { all: 'All', today: 'Today', week: 'This week', overdue: 'Overdue' }[ui.filter] + (ui.tag ? ` #${ui.tag}` : ''),
-  ].join(' / ');
   document.title = `${counts().due ? `(${counts().due}) ` : ''}Todo`;
   renderTagMenu();
 }
