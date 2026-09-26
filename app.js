@@ -46,6 +46,7 @@ const storage = {
 };
 
 const savedUi = storage.get(KEYS.ui, {});
+const isPhone = () => window.matchMedia('(width < 768px)').matches;
 
 const state = {
   config: DEMO ? { repo: 'demo/demo', demo: true } : storage.get(KEYS.config, null),
@@ -64,6 +65,7 @@ const ui = {
   filter: 'all',
   tag: '',
   activeCategory: savedUi.activeCategory ?? null,
+  sidebarOpen: savedUi.sidebarOpen ?? !isPhone(),
   showDone: new Set(),
   creatingIn: null,
   addingCategory: false,
@@ -75,6 +77,8 @@ const ui = {
 };
 
 let today = localToday();
+
+const saveUi = () => storage.set(KEYS.ui, { activeCategory: ui.activeCategory, sidebarOpen: ui.sidebarOpen });
 
 // region helpers
 
@@ -174,6 +178,7 @@ const categories = () => state.doc.categories;
 const columnOf = (task) => (categories().some((c) => c.id === task.category) ? task.category : UNCATEGORIZED);
 const categoryName = (id) => categories().find((c) => c.id === id)?.name ?? 'Uncategorized';
 const findTaskById = (id) => tasks().find((t) => t.id === id);
+const openCount = (columnId) => tasks().filter((t) => columnOf(t) === columnId && t.status === 'open').length;
 
 function isoWeek(date) {
   const d = utc(date);
@@ -291,8 +296,8 @@ async function refresh() {
 
 function isEditing() {
   const active = document.activeElement;
-  const typing = active?.closest?.('.board') && active.matches('input') && active.value.trim() !== '';
-  return Boolean(ui.editingId || ui.creatingIn || ui.deletingId || ui.renamingId || typing);
+  const typing = active?.closest?.('.board, .sidebar') && active.matches('input') && active.value.trim() !== '';
+  return Boolean(ui.deletingId || ui.renamingId || typing);
 }
 
 function safeRender() {
@@ -386,20 +391,75 @@ function renderTabs(list) {
         {
           type: 'button',
           class: `category-tabs__tab${c.id === ui.activeCategory ? ' category-tabs__tab--active' : ''}`,
-          onclick: () => {
-            ui.activeCategory = c.id;
-            storage.set(KEYS.ui, { activeCategory: c.id });
-            render();
-          },
+          onclick: () => selectCategory(c.id),
         },
         c.name,
-        h(
-          'span',
-          { class: 'category-tabs__count' },
-          String(tasks().filter((t) => columnOf(t) === c.id && t.status === 'open').length)
-        )
+        h('span', { class: 'category-tabs__count' }, String(openCount(c.id)))
       )
     )
+  );
+}
+
+function selectCategory(id) {
+  ui.activeCategory = id;
+  if (isPhone()) ui.sidebarOpen = false;
+  saveUi();
+  render();
+}
+
+function renderSidebar(list) {
+  $('#sidebar').hidden = !ui.sidebarOpen;
+  $('#sidebar-toggle').setAttribute('aria-expanded', String(ui.sidebarOpen));
+  $('#sidebar-list').replaceChildren(
+    ...list.map((c) => {
+      const active = c.id === ui.activeCategory;
+      const item = h(
+        'button',
+        {
+          type: 'button',
+          class: `sidebar__project${c.category ? '' : ' sidebar__project--loose'}${active ? ' sidebar__project--active' : ''}`,
+          'aria-current': active ? 'page' : null,
+          onclick: () => selectCategory(c.id),
+          ondragover: (e) => {
+            if (!e.dataTransfer.types.includes('application/x-todo-task')) return;
+            e.preventDefault();
+            item.classList.add('sidebar__project--drop-target');
+          },
+          ondragleave: () => item.classList.remove('sidebar__project--drop-target'),
+          ondrop: (e) => {
+            e.preventDefault();
+            item.classList.remove('sidebar__project--drop-target');
+            const taskId = e.dataTransfer.getData('application/x-todo-task');
+            if (taskId) moveTask(taskId, c.id);
+          },
+        },
+        h('span', { class: 'sidebar__name' }, c.name),
+        h('span', { class: 'sidebar__count' }, String(openCount(c.id)))
+      );
+      return h('li', {}, item);
+    })
+  );
+  $('#sidebar-add').replaceChildren(
+    ...(!list.length || !store()
+      ? []
+      : ui.addingCategory
+        ? [renderCategoryForm()]
+        : [
+            h(
+              'button',
+              {
+                class: 'quiet-button sidebar__new',
+                type: 'button',
+                onclick: () => {
+                  ui.addingCategory = true;
+                  render();
+                  $('[data-new-category]')?.focus();
+                },
+              },
+              icon('plus'),
+              'New project'
+            ),
+          ])
   );
 }
 
@@ -445,7 +505,9 @@ function renderCard(t, { done = false } = {}) {
   const card = h(
     'article',
     {
-      class: `task-card${done ? ' task-card--done' : ''}${!done && !matchesFilter(t) ? ' task-card--dimmed' : ''}`,
+      class: `task-card${done ? ' task-card--done' : ''}${!done && !matchesFilter(t) ? ' task-card--dimmed' : ''}${
+        t.id === ui.editingId ? ' task-card--open' : ''
+      }`,
       tabindex: '0',
       draggable: done ? null : 'true',
       dataset: { id: t.id },
@@ -661,26 +723,6 @@ function renderCategoryForm() {
   );
 }
 
-function renderGhostColumn() {
-  const body = ui.addingCategory
-    ? renderCategoryForm()
-    : h(
-        'button',
-        {
-          class: 'quiet-button',
-          type: 'button',
-          onclick: () => {
-            ui.addingCategory = true;
-            render();
-            $('[data-new-category]')?.focus();
-          },
-        },
-        icon('plus'),
-        'Add category'
-      );
-  return h('section', { class: 'board-column board-column--ghost' }, h('header', { class: 'board-column__header' }, body));
-}
-
 function renderEmptyBoard() {
   return h(
     'section',
@@ -718,9 +760,10 @@ function render() {
   renderHeader();
   renderSync();
   renderTabs(list);
-  $('#board').replaceChildren(
-    ...(list.length ? [...list.map((c, i) => renderColumn(c, i, list)), renderGhostColumn()] : [renderEmptyBoard()])
-  );
+  renderSidebar(list);
+  const index = list.findIndex((c) => c.id === ui.activeCategory);
+  $('#board').replaceChildren(index === -1 ? renderEmptyBoard() : renderColumn(list[index], index, list));
+  syncEditor();
   if (refocus) $(refocus)?.focus({ preventScroll: true });
 }
 
@@ -813,68 +856,149 @@ const categoryOptions = (selected, exclude) => [
     .map((c) => h('option', { value: c.id, selected: c.id === selected }, c.name)),
 ];
 
+const editorForm = $('#editor-form');
+
+function fillEditor(t, { categoryId = columnOf(t), keep = null } = {}) {
+  const f = editorForm.elements;
+  const set = (field, value) => {
+    if (field !== keep) field.value = value;
+  };
+  set(f.title, t.title);
+  set(f.notes, t.notes || '');
+  renderEditorLinks(t.notes);
+  set(f.due, t.due || '');
+  editorTags = [...t.tags];
+  renderTagChips();
+  if (f.category !== keep) f.category.replaceChildren(...categoryOptions(categoryId));
+  if (f.repeat !== keep) {
+    f.repeat.querySelector('[value="custom"]')?.remove();
+    const preset = presetFor(t.repeat);
+    if (preset === 'custom') f.repeat.append(h('option', { value: 'custom' }, describeRepeat(t.repeat)));
+    f.repeat.value = preset;
+  }
+  $('#editor-crumb').textContent = ui.creatingIn ? `New task · ${categoryName(t.category)}` : categoryName(t.category);
+  const source = $('#editor-source');
+  source.hidden = !t.source;
+  source.replaceChildren(
+    ...(t.source
+      ? [
+          icon(sourceIcon(t.source.key)),
+          t.source.url
+            ? h('a', { href: t.source.url, target: '_blank', rel: 'noopener' }, t.source.label || t.source.key)
+            : t.source.label || t.source.key,
+        ]
+      : [])
+  );
+}
+
+function showEditor(creating) {
+  $('#editor-delete').hidden = creating;
+  $('#editor').setAttribute('aria-label', creating ? 'New task' : 'Task');
+  $('#editor').hidden = false;
+}
+
 function openEditor(id) {
+  if (id === ui.editingId) return;
+  saveEditor();
   const t = findTaskById(id);
   if (!t) return;
   ui.editingId = id;
   ui.creatingIn = null;
-  const form = $('#editor-form');
-  setEditorMode('edit');
-  form.elements.title.value = t.title;
-  form.elements.notes.value = t.notes || '';
-  renderEditorLinks(t.notes);
-  form.elements.due.value = t.due || '';
-  editorTags = [...t.tags];
-  form.elements.tagQuery.value = '';
-  renderTagChips();
-  form.elements.category.replaceChildren(...categoryOptions(columnOf(t)));
-  const repeat = form.elements.repeat;
-  repeat.querySelector('[value="custom"]')?.remove();
-  const preset = presetFor(t.repeat);
-  if (preset === 'custom') repeat.append(h('option', { value: 'custom' }, describeRepeat(t.repeat)));
-  repeat.value = preset;
-
-  $('#editor-crumb').textContent = categoryName(t.category);
-  $('#editor-source').replaceChildren(
-    ...(t.source
-      ? [
-          'From ',
-          t.source.url
-            ? h('a', { href: t.source.url, target: '_blank', rel: 'noopener' }, t.source.key)
-            : t.source.key,
-        ]
-      : [])
-  );
-  showModal('#editor');
-  setTimeout(() => form.elements.title.focus(), 50);
-}
-
-function setEditorMode(mode) {
-  const creating = mode === 'create';
-  $('#editor-delete').hidden = creating;
-  $('#editor-submit').textContent = creating ? 'Add task' : 'Save';
-  $('#editor-form').setAttribute('aria-label', creating ? 'New task' : 'Edit task');
+  editorForm.elements.tagQuery.value = '';
+  fillEditor(t);
+  showEditor(false);
+  render();
 }
 
 function openNewTask(columnId) {
+  saveEditor();
   ui.creatingIn = columnId;
   ui.editingId = null;
-  const form = $('#editor-form');
-  setEditorMode('create');
-  form.elements.title.value = '';
-  form.elements.notes.value = '';
-  renderEditorLinks('');
-  form.elements.due.value = '';
-  editorTags = [];
-  form.elements.tagQuery.value = '';
-  renderTagChips();
-  form.elements.category.replaceChildren(...categoryOptions(columnId));
-  form.elements.repeat.querySelector('[value="custom"]')?.remove();
-  form.elements.repeat.value = '';
-  $('#editor-crumb').textContent = `New task · ${categoryName(columnId === UNCATEGORIZED ? null : columnId)}`;
-  $('#editor-source').replaceChildren();
-  showModal('#editor');
-  setTimeout(() => form.elements.title.focus(), 50);
+  editorForm.elements.tagQuery.value = '';
+  const category = columnId === UNCATEGORIZED ? null : columnId;
+  fillEditor({ title: '', notes: '', due: null, repeat: null, tags: [], category }, { categoryId: columnId });
+  showEditor(true);
+  render();
+  editorForm.elements.title.focus();
+}
+
+function hideEditor() {
+  closeTagSuggest();
+  $('#editor').hidden = true;
+  ui.editingId = null;
+  ui.creatingIn = null;
+}
+
+function closeEditor() {
+  saveEditor();
+  hideEditor();
+  render();
+}
+
+function syncEditor() {
+  if (!ui.editingId) return;
+  const t = findTaskById(ui.editingId);
+  if (!t || t.status !== 'open') return hideEditor();
+  fillEditor(t, { keep: document.activeElement });
+}
+
+function saveEditor() {
+  const f = editorForm.elements;
+  const category = f.category.value === UNCATEGORIZED ? null : f.category.value || null;
+  if (ui.creatingIn) {
+    const { title, tags } = parseTitle(f.title.value);
+    if (!title) return;
+    const task = {
+      id: makeId(),
+      title,
+      notes: f.notes.value,
+      category,
+      tags: [...new Set([...editorTags, ...tags])],
+      due: f.due.value || null,
+      repeat: f.repeat.value || null,
+      addedBy: 'app',
+    };
+    ui.creatingIn = null;
+    ui.editingId = task.id;
+    ui.activeCategory = category ?? UNCATEGORIZED;
+    showEditor(false);
+    dispatch([{ type: 'add', task }]);
+    return;
+  }
+  const t = ui.editingId && findTaskById(ui.editingId);
+  if (!t) return;
+  const patch = {};
+  const title = f.title.value.trim();
+  if (!title) f.title.value = t.title;
+  else if (title !== t.title) patch.title = title;
+  if (f.notes.value.trim() !== (t.notes || '')) patch.notes = f.notes.value;
+  if (category !== (columnOf(t) === UNCATEGORIZED ? null : t.category)) patch.category = category;
+  if (editorTags.join(' ') !== t.tags.join(' ')) patch.tags = editorTags;
+  if ((f.due.value || null) !== (t.due ?? null)) patch.due = f.due.value || null;
+  if (f.repeat.value !== 'custom' && f.repeat.value !== presetFor(t.repeat)) patch.repeat = f.repeat.value || null;
+  if (!Object.keys(patch).length) return;
+  if ('category' in patch) {
+    ui.activeCategory = category ?? UNCATEGORIZED;
+    saveUi();
+  }
+  dispatch([{ type: 'update', id: t.id, patch }]);
+}
+
+let pointerHeld = false;
+document.addEventListener('pointerdown', () => (pointerHeld = true), true);
+for (const type of ['pointerup', 'pointercancel']) {
+  document.addEventListener(type, () => setTimeout(() => (pointerHeld = false)), true);
+}
+
+function saveEditorSoon() {
+  if (!pointerHeld) return saveEditor();
+  const later = () => {
+    document.removeEventListener('pointerup', later, true);
+    document.removeEventListener('pointercancel', later, true);
+    setTimeout(saveEditor);
+  };
+  document.addEventListener('pointerup', later, true);
+  document.addEventListener('pointercancel', later, true);
 }
 
 function renderEditorLinks(notes) {
@@ -888,10 +1012,10 @@ function renderEditorLinks(notes) {
         {},
         h(
           'a',
-          { class: 'editor__link', href: link.url, target: '_blank', rel: 'noopener' },
+          { class: 'task-page__link', href: link.url, target: '_blank', rel: 'noopener' },
           icon('arrow-up-right'),
-          h('span', { class: 'editor__link-label' }, link.label),
-          h('span', { class: 'editor__link-host' }, link.host)
+          h('span', { class: 'task-page__link-label' }, link.label),
+          h('span', { class: 'task-page__link-host' }, link.host)
         )
       )
     )
@@ -900,57 +1024,24 @@ function renderEditorLinks(notes) {
 
 $('#editor-notes').addEventListener('input', (e) => renderEditorLinks(e.target.value));
 
-function closeEditor() {
-  closeTagSuggest();
-  hideModal('#editor');
-  ui.editingId = null;
-  ui.creatingIn = null;
-  if (state.stale) render();
-}
-
-$('#editor-form').addEventListener('submit', (e) => {
+editorForm.addEventListener('submit', (e) => e.preventDefault());
+editorForm.addEventListener('change', (e) => {
+  if (e.target.matches('select, [type="date"]')) saveEditor();
+});
+editorForm.addEventListener('focusout', (e) => {
+  if (e.target === tagInput && tagInput.value.trim()) commitTag(tagInput.value);
+  else if (e.target.matches('input, textarea')) saveEditorSoon();
+});
+editorForm.elements.title.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
   e.preventDefault();
-  const f = e.target.elements;
-  commitTag(f.tagQuery.value);
-  const category = f.category.value === UNCATEGORIZED ? null : f.category.value;
-  if (ui.creatingIn) {
-    const { title, tags } = parseTitle(f.title.value);
-    if (!title) return f.title.focus();
-    const task = {
-      id: makeId(),
-      title,
-      notes: f.notes.value,
-      category,
-      tags: [...new Set([...editorTags, ...tags])],
-      due: f.due.value || null,
-      repeat: f.repeat.value || null,
-      addedBy: 'app',
-    };
-    ui.activeCategory = category ?? UNCATEGORIZED;
-    closeEditor();
-    dispatch([{ type: 'add', task }]);
-    return;
-  }
-  const t = findTaskById(ui.editingId);
-  if (!t) return closeEditor();
-  const patch = {
-    title: f.title.value.trim() || t.title,
-    notes: f.notes.value,
-    category,
-    tags: editorTags,
-    due: f.due.value || null,
-  };
-  if (f.repeat.value !== 'custom') patch.repeat = f.repeat.value || null;
-  ui.activeCategory = category ?? UNCATEGORIZED;
-  const id = ui.editingId;
-  closeEditor();
-  dispatch([{ type: 'update', id, patch }]);
+  editorForm.elements.notes.focus();
 });
 
 $('#editor-delete').addEventListener('click', () => {
   const t = findTaskById(ui.editingId);
-  closeEditor();
-  if (!t) return;
+  hideEditor();
+  if (!t) return render();
   const snapshot = structuredClone(t);
   dispatch([{ type: 'delete', id: t.id }]);
   toast('Deleted', restoreTask(snapshot));
@@ -988,6 +1079,7 @@ function renderTagChips() {
               renderTagChips();
               tagInput.focus();
               if (tagSuggest.matches(':popover-open')) renderTagSuggest();
+              saveEditor();
             },
           },
           icon('x')
@@ -1073,6 +1165,7 @@ function commitTag(value) {
   if (tag && !editorTags.includes(tag)) editorTags.push(tag);
   renderTagChips();
   if (tagSuggest.matches(':popover-open')) openTagSuggest();
+  saveEditor();
 }
 
 $('#editor-tag-field').addEventListener('click', () => tagInput.focus());
@@ -1109,6 +1202,7 @@ tagInput.addEventListener('keydown', (e) => {
     editorTags.pop();
     renderTagChips();
     if (open) renderTagSuggest();
+    saveEditor();
   } else if (e.key === 'Escape' && open) {
     e.stopPropagation();
     closeTagSuggest();
@@ -1287,6 +1381,11 @@ $('#connect-forget').addEventListener('click', () => {
 document.querySelectorAll('#connect [data-close]').forEach((el) => el.addEventListener('click', closeConnect));
 $('#open-settings').addEventListener('click', openConnect);
 $('#add-fab').addEventListener('click', () => startAdding(ui.activeCategory ?? UNCATEGORIZED));
+$('#sidebar-toggle').addEventListener('click', () => {
+  ui.sidebarOpen = !ui.sidebarOpen;
+  saveUi();
+  renderSidebar(columns());
+});
 
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;

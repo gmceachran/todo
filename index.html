@@ -43,6 +43,16 @@
 
     <section class="workspace" aria-label="Workspace">
       <div class="panel-bar">
+        <button
+          id="sidebar-toggle"
+          class="quiet-button quiet-button--icon"
+          type="button"
+          aria-label="Projects"
+          aria-controls="sidebar"
+          aria-expanded="false"
+        >
+          <i class="ph ph-sidebar-simple icon" aria-hidden="true"></i>
+        </button>
         <div class="view-tabs" role="radiogroup" aria-label="Show">
           <input class="view-tabs__input" type="radio" name="filter" id="filter-all" value="all" checked />
           <label class="view-tabs__label" for="filter-all">All</label>
@@ -70,75 +80,76 @@
         </div>
       </div>
       <nav id="category-tabs" class="category-tabs" aria-label="Categories"></nav>
-      <main id="board" class="board" aria-label="Task board"></main>
+      <div class="workspace__body">
+        <nav id="sidebar" class="sidebar" aria-label="Projects" hidden>
+          <h2 class="sidebar__heading label">Projects</h2>
+          <ul id="sidebar-list" class="sidebar__list"></ul>
+          <div id="sidebar-add" class="sidebar__add"></div>
+        </nav>
+        <main id="board" class="board" aria-label="Task board"></main>
+        <aside id="editor" class="task-page" aria-label="Task" hidden>
+          <form id="editor-form" class="task-page__card" autocomplete="off">
+            <header class="task-page__header">
+              <span id="editor-crumb" class="task-page__crumb label"></span>
+              <button id="editor-delete" class="quiet-button quiet-button--danger" type="button">Delete</button>
+              <button class="quiet-button quiet-button--icon" type="button" data-close aria-label="Close">
+                <i class="ph ph-x icon" aria-hidden="true"></i>
+              </button>
+            </header>
+            <div class="task-page__body">
+              <input id="editor-title" class="task-page__title" name="title" placeholder="Task title" autocomplete="off" />
+              <div class="task-page__props">
+                <label class="prop">
+                  <i class="ph ph-folder-simple icon" aria-hidden="true"></i>
+                  <select id="editor-category" class="prop__control" name="category" aria-label="Category"></select>
+                </label>
+                <label class="prop">
+                  <i class="ph ph-calendar-blank icon" aria-hidden="true"></i>
+                  <input id="editor-due" class="prop__control" type="date" name="due" aria-label="Due date" />
+                </label>
+                <label class="prop">
+                  <i class="ph ph-repeat icon" aria-hidden="true"></i>
+                  <select id="editor-repeat" class="prop__control" name="repeat" aria-label="Repeat">
+                    <option value="">No repeat</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekdays">Weekdays</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="biweekly">Every 2 weeks</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </label>
+                <div id="editor-tag-field" class="prop prop--grow tag-field">
+                  <i class="ph ph-tag icon" aria-hidden="true"></i>
+                  <span id="editor-tag-chips" class="tag-field__chips"></span>
+                  <input
+                    id="editor-tags"
+                    class="prop__control tag-field__input"
+                    name="tagQuery"
+                    placeholder="Add tag"
+                    autocomplete="off"
+                    spellcheck="false"
+                    autocapitalize="off"
+                    role="combobox"
+                    aria-label="Add a tag"
+                    aria-autocomplete="list"
+                    aria-expanded="false"
+                    aria-controls="tag-suggest"
+                  />
+                </div>
+              </div>
+              <p id="editor-source" class="task-page__source" hidden></p>
+              <textarea id="editor-notes" class="task-page__notes" name="notes" placeholder="Add notes…"></textarea>
+              <ul id="editor-links" class="task-page__links" aria-label="Links in notes" hidden></ul>
+            </div>
+          </form>
+        </aside>
+      </div>
     </section>
 
     <button id="add-fab" class="fab" type="button" aria-label="Add task">
       <i class="ph ph-plus icon" aria-hidden="true"></i>
     </button>
-
-    <div id="editor" class="modal-wrapper" aria-hidden="true">
-      <div class="modal-wrapper__backdrop" data-close></div>
-      <form id="editor-form" class="modal editor" role="dialog" aria-modal="true" aria-label="Edit task">
-        <div class="editor__crumbs">
-          <span id="editor-crumb" class="editor__crumb"></span>
-          <button class="editor__close" type="button" data-close aria-label="Close">
-            <i class="ph ph-x icon" aria-hidden="true"></i>
-          </button>
-        </div>
-        <input id="editor-title" class="editor__title" name="title" placeholder="Task title" required autocomplete="off" />
-        <textarea id="editor-notes" class="editor__notes" name="notes" rows="4" placeholder="Add notes…"></textarea>
-        <ul id="editor-links" class="editor__links" aria-label="Links in notes" hidden></ul>
-
-        <div class="editor__props">
-          <label class="prop">
-            <i class="ph ph-folder-simple icon" aria-hidden="true"></i>
-            <select id="editor-category" class="prop__control" name="category" aria-label="Category"></select>
-          </label>
-          <label class="prop">
-            <i class="ph ph-calendar-blank icon" aria-hidden="true"></i>
-            <input id="editor-due" class="prop__control" type="date" name="due" aria-label="Due date" />
-          </label>
-          <label class="prop">
-            <i class="ph ph-repeat icon" aria-hidden="true"></i>
-            <select id="editor-repeat" class="prop__control" name="repeat" aria-label="Repeat">
-              <option value="">No repeat</option>
-              <option value="daily">Daily</option>
-              <option value="weekdays">Weekdays</option>
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Every 2 weeks</option>
-              <option value="monthly">Monthly</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </label>
-          <div id="editor-tag-field" class="prop prop--grow tag-field">
-            <i class="ph ph-tag icon" aria-hidden="true"></i>
-            <span id="editor-tag-chips" class="tag-field__chips"></span>
-            <input
-              id="editor-tags"
-              class="prop__control tag-field__input"
-              name="tagQuery"
-              placeholder="Add tag"
-              autocomplete="off"
-              spellcheck="false"
-              autocapitalize="off"
-              role="combobox"
-              aria-label="Add a tag"
-              aria-autocomplete="list"
-              aria-expanded="false"
-              aria-controls="tag-suggest"
-            />
-          </div>
-        </div>
-
-        <footer class="editor__footer">
-          <p id="editor-source" class="editor__source"></p>
-          <button id="editor-delete" class="quiet-button quiet-button--danger" type="button">Delete</button>
-          <button class="quiet-button" type="button" data-close>Cancel</button>
-          <button id="editor-submit" class="quiet-button quiet-button--primary" type="submit">Save</button>
-        </footer>
-      </form>
-    </div>
 
     <div id="tag-suggest" class="tag-menu__list tag-suggest" popover="manual" role="listbox" aria-label="Tag suggestions"></div>
 
