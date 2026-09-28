@@ -17,7 +17,7 @@ function seed() {
 
   add({ title: 'Send invoice to Acme', category: admin, due: addDays(today, -2), tags: ['finance'], source: { key: 'gmail:demo1', label: 'Email', url: 'https://mail.google.com/' } });
   add({ title: 'Pay rent', category: admin, due: firstOfNextMonth, repeat: 'every month on the 1st' });
-  add({ title: 'Submit expense report', category: admin, due: addDays(today, 3), tags: ['finance'] });
+  add({ title: 'Submit expense report', category: admin, due: addDays(today, 3), tags: ['finance'], subtasks: ['Collect receipts', 'Fill in the form', 'Get manager sign-off'] });
   add({ title: 'Renew passport', category: admin, tags: ['errand'] });
   add({ title: 'Fix login redirect loop', category: work, due: today, tags: ['deep-work'], source: { key: 'linear:RM-12', label: 'RM-12', url: 'https://linear.app/' } });
   add({ title: 'Review dock quote PR', category: work, due: addDays(today, 4), source: { key: 'linear:RM-14', label: 'RM-14', url: 'https://linear.app/' } });

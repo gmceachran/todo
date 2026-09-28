@@ -228,6 +228,14 @@ function normalizeDue(due) {
   return due;
 }
 
+function normalizeSubtasks(list) {
+  if (!Array.isArray(list)) return [];
+  return list
+    .map((item) => (typeof item === 'string' ? { title: item } : item || {}))
+    .filter((item) => cleanText(item.title))
+    .map((item) => ({ id: cleanText(item.id) || makeId('s'), title: cleanText(item.title), done: Boolean(item.done) }));
+}
+
 export function normalizeTags(tags) {
   const list = Array.isArray(tags) ? tags : typeof tags === 'string' ? tags.split(/[,\s]+/) : [];
   const clean = list
@@ -254,6 +262,10 @@ export function normalizeDoc(doc) {
   for (const task of result.tasks) {
     if (!Array.isArray(task.tags)) task.tags = [];
     if (task.category === undefined) task.category = null;
+    if ('subtasks' in task) {
+      task.subtasks = normalizeSubtasks(task.subtasks);
+      if (!task.subtasks.length) delete task.subtasks;
+    }
   }
   return result;
 }
@@ -400,6 +412,8 @@ export function applyOp(doc, op, ctx = {}) {
     const notes = cleanText(input.notes);
     if (notes) task.notes = notes;
     if (source) task.source = source;
+    const subtasks = normalizeSubtasks(input.subtasks);
+    if (subtasks.length) task.subtasks = subtasks;
     if (input.addedBy) task.addedBy = input.addedBy;
     doc.tasks.push(task);
     return { task };
@@ -451,6 +465,7 @@ export function applyOp(doc, op, ctx = {}) {
         task.prevDue = task.due;
         task.due = next;
         task.lastDone = now;
+        for (const subtask of task.subtasks || []) subtask.done = false;
       } else {
         if (task.status === 'done') return { skipped: 'already', task };
         task.status = 'done';
@@ -468,6 +483,34 @@ export function applyOp(doc, op, ctx = {}) {
         task.status = 'open';
         delete task.completed;
       }
+      break;
+    }
+    case 'addSubtask': {
+      const input = op.subtask || {};
+      const title = cleanText(input.title);
+      if (!title) throw new Error('A subtask needs a title');
+      task.subtasks ??= [];
+      if (input.id && task.subtasks.some((s) => s.id === input.id)) return { skipped: 'exists', task };
+      task.subtasks.push({ id: input.id || makeId('s'), title, done: false });
+      break;
+    }
+    case 'updateSubtask': {
+      const subtask = task.subtasks?.find((s) => s.id === op.subtaskId);
+      if (!subtask) return { skipped: 'missing', task };
+      const patch = op.patch || {};
+      if ('title' in patch) {
+        const title = cleanText(patch.title);
+        if (!title) throw new Error('A subtask needs a title');
+        subtask.title = title;
+      }
+      if ('done' in patch) subtask.done = Boolean(patch.done);
+      break;
+    }
+    case 'removeSubtask': {
+      const index = task.subtasks?.findIndex((s) => s.id === op.subtaskId) ?? -1;
+      if (index === -1) return { skipped: 'missing', task };
+      task.subtasks.splice(index, 1);
+      if (!task.subtasks.length) delete task.subtasks;
       break;
     }
     case 'delete':
@@ -525,6 +568,7 @@ export function decodeImport(payload) {
       tags: Array.isArray(t.tags) ? t.tags : [],
       due: typeof t.due === 'string' && isDate(t.due) ? t.due : null,
       source: t.source && typeof t.source.key === 'string' ? t.source : undefined,
+      subtasks: Array.isArray(t.subtasks) ? t.subtasks.filter((s) => typeof s === 'string').slice(0, 20) : undefined,
     }));
 }
 

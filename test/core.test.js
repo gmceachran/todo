@@ -63,6 +63,29 @@ test('recurring tasks without a due date start today', () => {
   assert.equal(task.due, '2026-09-24');
 });
 
+test('subtasks can be added, checked, renamed, and removed', () => {
+  const doc = emptyDoc();
+  const { task } = applyOp(doc, { type: 'add', task: { title: 'Move house', subtasks: ['Book van', ' '] } }, ctx);
+  assert.deepEqual(task.subtasks.map((s) => [s.title, s.done]), [['Book van', false]]);
+  applyOp(doc, { type: 'addSubtask', id: task.id, subtask: { id: 's_2', title: 'Pack kitchen' } }, ctx);
+  assert.equal(applyOp(doc, { type: 'addSubtask', id: task.id, subtask: { id: 's_2', title: 'Pack kitchen' } }, ctx).skipped, 'exists');
+  applyOp(doc, { type: 'updateSubtask', id: task.id, subtaskId: 's_2', patch: { done: true, title: 'Pack the kitchen' } }, ctx);
+  assert.deepEqual(task.subtasks[1], { id: 's_2', title: 'Pack the kitchen', done: true });
+  assert.throws(() => applyOp(doc, { type: 'updateSubtask', id: task.id, subtaskId: 's_2', patch: { title: '' } }, ctx));
+  assert.equal(applyOp(doc, { type: 'removeSubtask', id: task.id, subtaskId: 'nope' }, ctx).skipped, 'missing');
+  applyOp(doc, { type: 'removeSubtask', id: task.id, subtaskId: task.subtasks[0].id }, ctx);
+  applyOp(doc, { type: 'removeSubtask', id: task.id, subtaskId: 's_2' }, ctx);
+  assert.equal('subtasks' in task, false);
+});
+
+test('completing a recurring task unchecks its subtasks', () => {
+  const doc = emptyDoc();
+  const { task } = applyOp(doc, { type: 'add', task: { title: 'Weekly review', repeat: 'weekly', subtasks: ['Inbox zero'] } }, ctx);
+  applyOp(doc, { type: 'updateSubtask', id: task.id, subtaskId: task.subtasks[0].id, patch: { done: true } }, ctx);
+  applyOp(doc, { type: 'complete', id: task.id, due: task.due }, ctx);
+  assert.equal(task.subtasks[0].done, false);
+});
+
 test('source keys dedupe additions and deleted tasks stay deleted', () => {
   const doc = emptyDoc();
   const first = applyOp(doc, { type: 'add', task: { title: 'Fix login', source: 'linear:RM-12' } }, ctx);

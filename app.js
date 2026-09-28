@@ -510,6 +510,13 @@ function renderCard(t, { done = false, project = false } = {}) {
         due.label
       ),
     t.repeat && h('span', { class: 'task-card__meta-item' }, icon('repeat'), describeRepeat(t.repeat)),
+    t.subtasks?.length > 0 &&
+      h(
+        'span',
+        { class: 'task-card__meta-item', title: `${t.subtasks.filter((s) => s.done).length} of ${plural(t.subtasks.length, 'subtask')} done` },
+        icon('list-checks'),
+        `${t.subtasks.filter((s) => s.done).length}/${t.subtasks.length}`
+      ),
     linkCount > 0 &&
       h(
         'span',
@@ -957,6 +964,8 @@ function fillEditor(t, { categoryId = columnOf(t), keep = null } = {}) {
   set(f.due, t.due || '');
   editorTags = [...t.tags];
   renderTagChips();
+  if (ui.creatingIn) editorSubtasks = structuredClone(t.subtasks ?? []);
+  renderSubtasks(keep);
   if (f.category !== keep) f.category.replaceChildren(...categoryOptions(categoryId));
   if (f.repeat !== keep) {
     f.repeat.querySelector('[value="custom"]')?.remove();
@@ -993,6 +1002,7 @@ function openEditor(id) {
   ui.editingId = id;
   ui.creatingIn = null;
   editorForm.elements.tagQuery.value = '';
+  editorForm.elements.newSubtask.value = '';
   fillEditor(t);
   showEditor(false);
   render();
@@ -1003,6 +1013,7 @@ function openNewTask(columnId) {
   ui.creatingIn = columnId;
   ui.editingId = null;
   editorForm.elements.tagQuery.value = '';
+  editorForm.elements.newSubtask.value = '';
   const forToday = columnId === TODAY;
   const category = forToday || columnId === UNCATEGORIZED ? null : columnId;
   fillEditor(
@@ -1048,6 +1059,7 @@ function saveEditor() {
       tags: [...new Set([...editorTags, ...tags])],
       due: f.due.value || null,
       repeat: f.repeat.value || null,
+      subtasks: editorSubtasks,
       addedBy: 'app',
     };
     ui.creatingIn = null;
@@ -1121,8 +1133,9 @@ editorForm.addEventListener('change', (e) => {
   if (e.target.matches('select, [type="date"]')) saveEditor();
 });
 editorForm.addEventListener('focusout', (e) => {
-  if (e.target === tagInput && tagInput.value.trim()) commitTag(tagInput.value);
-  else if (e.target.matches('input, textarea')) saveEditorSoon();
+  if (e.target === tagInput && tagInput.value.trim()) return commitTag(tagInput.value);
+  if (e.target === subtaskInput) commitSubtask();
+  if (e.target.matches('input, textarea')) saveEditorSoon();
 });
 editorForm.elements.title.addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
@@ -1140,6 +1153,96 @@ $('#editor-delete').addEventListener('click', () => {
 });
 
 document.querySelectorAll('#editor [data-close]').forEach((el) => el.addEventListener('click', closeEditor));
+
+// region subtasks
+
+let editorSubtasks = [];
+const subtaskList = $('#editor-subtasks');
+const subtaskInput = $('#editor-subtask-new');
+
+const currentSubtasks = () => (ui.creatingIn ? editorSubtasks : (findTaskById(ui.editingId)?.subtasks ?? []));
+
+function changeSubtasks(op) {
+  if (!ui.creatingIn) return dispatch([{ ...op, id: ui.editingId }]);
+  const draft = { id: 'draft', subtasks: editorSubtasks };
+  try {
+    applyOp({ ...emptyDoc(), tasks: [draft] }, { ...op, id: draft.id });
+  } catch (error) {
+    return toast(error.message);
+  }
+  editorSubtasks = draft.subtasks ?? [];
+  renderSubtasks();
+}
+
+function commitSubtask() {
+  const title = subtaskInput.value.trim();
+  if (!title) return;
+  subtaskInput.value = '';
+  changeSubtasks({ type: 'addSubtask', subtask: { id: makeId('s'), title } });
+}
+
+function renderSubtask(s) {
+  const item = h(
+    'li',
+    { class: `subtask${s.done ? ' subtask--done' : ''}` },
+    h('input', {
+      class: 'subtask__check',
+      type: 'checkbox',
+      checked: s.done,
+      'aria-label': `${s.title} done`,
+      onchange: (e) => {
+        item.classList.toggle('subtask--done', e.target.checked);
+        changeSubtasks({ type: 'updateSubtask', subtaskId: s.id, patch: { done: e.target.checked } });
+      },
+    }),
+    h('input', {
+      class: 'subtask__title',
+      value: s.title,
+      'aria-label': 'Subtask',
+      onkeydown: (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          subtaskInput.focus();
+        } else if (e.key === 'Escape') {
+          e.target.value = s.title;
+        }
+      },
+      onblur: (e) => {
+        const title = e.target.value.trim();
+        if (!title) e.target.value = s.title;
+        else if (title !== s.title) changeSubtasks({ type: 'updateSubtask', subtaskId: s.id, patch: { title } });
+      },
+    }),
+    h(
+      'button',
+      {
+        class: 'quiet-button quiet-button--icon subtask__remove',
+        type: 'button',
+        'aria-label': `Remove "${s.title}"`,
+        onclick: () => {
+          subtaskInput.focus();
+          changeSubtasks({ type: 'removeSubtask', subtaskId: s.id });
+        },
+      },
+      icon('x')
+    )
+  );
+  return item;
+}
+
+function renderSubtasks(keep = null) {
+  const list = currentSubtasks();
+  $('#editor-subtask-heading').hidden = !list.length;
+  $('#editor-subtask-count').textContent = `${list.filter((s) => s.done).length}/${list.length}`;
+  if (keep && subtaskList.contains(keep)) return;
+  subtaskList.replaceChildren(...list.map(renderSubtask));
+}
+
+subtaskInput.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  commitSubtask();
+});
 
 // region tag picker
 

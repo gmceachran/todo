@@ -1224,6 +1224,86 @@ button.ghost-select {
     }
   }
 
+  .task-page__subtasks {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .task-page__subtasks-heading {
+    display: flex;
+    gap: var(--op-space-x-small);
+    margin: 0 0 var(--op-space-2x-small);
+    color: var(--td-muted);
+  }
+
+  .subtasks {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .subtask,
+  .subtasks__add {
+    display: flex;
+    align-items: center;
+    gap: var(--op-space-small);
+    min-block-size: calc(4.5 * var(--op-size-unit));
+  }
+
+  .subtask__check,
+  .subtasks__add .icon {
+    flex: none;
+    inline-size: var(--op-font-medium);
+    block-size: var(--op-font-medium);
+    margin: 0;
+  }
+
+  .subtask__check {
+    accent-color: var(--td-secondary);
+    cursor: pointer;
+  }
+
+  .subtasks__add .icon {
+    --__op-icon-font-size: var(--op-font-medium);
+
+    color: var(--td-faint);
+  }
+
+  .subtask__title,
+  .subtasks__input {
+    flex: 1;
+    min-inline-size: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--td-text);
+    font: inherit;
+    font-size: var(--td-font-body);
+
+    &:focus {
+      outline: none;
+    }
+
+    &::placeholder {
+      color: var(--td-faint);
+    }
+  }
+
+  .subtask--done .subtask__title {
+    color: var(--td-muted);
+    text-decoration: line-through;
+    text-decoration-color: var(--td-faint);
+  }
+
+  .subtask__remove {
+    opacity: var(--op-opacity-none);
+  }
+
+  .subtask:hover .subtask__remove,
+  .subtask:focus-within .subtask__remove {
+    opacity: var(--op-opacity-full);
+  }
+
   .task-page__notes {
     flex: 1;
     min-block-size: calc(40 * var(--op-size-unit));

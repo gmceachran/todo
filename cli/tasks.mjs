@@ -177,6 +177,7 @@ function formatTask(doc, task) {
   if (task.due) bits.push(task.due);
   if (task.repeat) bits.push(`↻ ${describeRepeat(task.repeat)}`);
   if (task.tags.length) bits.push(task.tags.map((t) => `#${t}`).join(' '));
+  if (task.subtasks?.length) bits.push(`☑ ${task.subtasks.filter((s) => s.done).length}/${task.subtasks.length}`);
   if (task.source) bits.push(task.source.key);
   return `  ${task.id}  ${task.title}  (${bits.join(' · ')})`;
 }

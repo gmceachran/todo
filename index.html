@@ -140,6 +140,23 @@
                 </div>
               </div>
               <p id="editor-source" class="task-page__source" hidden></p>
+              <section class="task-page__subtasks" aria-label="Subtasks">
+                <h3 id="editor-subtask-heading" class="task-page__subtasks-heading label" hidden>
+                  Subtasks <span id="editor-subtask-count"></span>
+                </h3>
+                <ul id="editor-subtasks" class="subtasks"></ul>
+                <label class="subtasks__add">
+                  <i class="ph ph-plus icon" aria-hidden="true"></i>
+                  <input
+                    id="editor-subtask-new"
+                    class="subtasks__input"
+                    name="newSubtask"
+                    placeholder="Add subtask"
+                    autocomplete="off"
+                    aria-label="Add a subtask"
+                  />
+                </label>
+              </section>
               <textarea id="editor-notes" class="task-page__notes" name="notes" placeholder="Add notes…"></textarea>
               <ul id="editor-links" class="task-page__links" aria-label="Links in notes" hidden></ul>
             </div>
