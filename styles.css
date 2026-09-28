@@ -1040,6 +1040,15 @@ button.ghost-select {
     list-style: none;
   }
 
+  .sidebar__views {
+    padding-block-start: var(--op-space-small);
+
+    .icon {
+      align-self: center;
+      color: var(--td-muted);
+    }
+  }
+
   .sidebar__project {
     display: flex;
     align-items: baseline;

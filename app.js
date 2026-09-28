@@ -22,6 +22,7 @@ const DEMO = new URLSearchParams(location.search).has('demo');
 const PREFIX = DEMO ? 'todo.demo.' : 'todo.';
 const KEYS = Object.fromEntries(['config', 'cache', 'pending', 'ui', 'inbox'].map((key) => [key, `${PREFIX}${key}`]));
 const UNCATEGORIZED = 'none';
+const TODAY = 'today';
 const POLL_MS = 60000;
 
 const storage = {
@@ -179,6 +180,7 @@ const columnOf = (task) => (categories().some((c) => c.id === task.category) ? t
 const categoryName = (id) => categories().find((c) => c.id === id)?.name ?? 'Uncategorized';
 const findTaskById = (id) => tasks().find((t) => t.id === id);
 const openCount = (columnId) => tasks().filter((t) => columnOf(t) === columnId && t.status === 'open').length;
+const dueByToday = () => tasks().filter((t) => t.status === 'open' && t.due && t.due <= today);
 
 function isoWeek(date) {
   const d = utc(date);
@@ -384,8 +386,9 @@ function columns() {
 }
 
 function renderTabs(list) {
+  const views = list.length ? [{ id: TODAY, name: 'Today', count: dueByToday().length }] : [];
   $('#category-tabs').replaceChildren(
-    ...list.map((c) =>
+    ...[...views, ...list].map((c) =>
       h(
         'button',
         {
@@ -394,7 +397,7 @@ function renderTabs(list) {
           onclick: () => selectCategory(c.id),
         },
         c.name,
-        h('span', { class: 'category-tabs__count' }, String(openCount(c.id)))
+        h('span', { class: 'category-tabs__count' }, String(c.count ?? openCount(c.id)))
       )
     )
   );
@@ -410,6 +413,32 @@ function selectCategory(id) {
 function renderSidebar(list) {
   $('#sidebar').hidden = !ui.sidebarOpen;
   $('#sidebar-toggle').setAttribute('aria-expanded', String(ui.sidebarOpen));
+  const todayActive = ui.activeCategory === TODAY;
+  const todayItem = h(
+    'button',
+    {
+      type: 'button',
+      class: `sidebar__project${todayActive ? ' sidebar__project--active' : ''}`,
+      'aria-current': todayActive ? 'page' : null,
+      onclick: () => selectCategory(TODAY),
+      ondragover: (e) => {
+        if (!e.dataTransfer.types.includes('application/x-todo-task')) return;
+        e.preventDefault();
+        todayItem.classList.add('sidebar__project--drop-target');
+      },
+      ondragleave: () => todayItem.classList.remove('sidebar__project--drop-target'),
+      ondrop: (e) => {
+        e.preventDefault();
+        todayItem.classList.remove('sidebar__project--drop-target');
+        const taskId = e.dataTransfer.getData('application/x-todo-task');
+        if (taskId) dueToday(taskId);
+      },
+    },
+    icon('sun'),
+    h('span', { class: 'sidebar__name' }, 'Today'),
+    h('span', { class: 'sidebar__count' }, String(dueByToday().length))
+  );
+  $('#sidebar-views').replaceChildren(h('li', {}, todayItem));
   $('#sidebar-list').replaceChildren(
     ...list.map((c) => {
       const active = c.id === ui.activeCategory;
@@ -463,12 +492,13 @@ function renderSidebar(list) {
   );
 }
 
-function renderCard(t, { done = false } = {}) {
+function renderCard(t, { done = false, project = false } = {}) {
   const due = dueInfo(t.due);
   const linkCount = noteLinks(t.notes).length;
   const meta = h(
     'div',
     { class: 'task-card__meta' },
+    project && h('span', { class: 'task-card__meta-item' }, icon('folder-simple'), categoryName(columnOf(t) === UNCATEGORIZED ? null : t.category)),
     t.tags.map((tag) =>
       h('span', { class: 'task-card__meta-item task-card__tag', style: `--td-tag-mix: ${tagMix(tag)}%` }, tag)
     ),
@@ -691,6 +721,50 @@ function renderColumn(c, index, list) {
   return column;
 }
 
+function renderToday() {
+  const open = dueByToday().sort(sortCards);
+  const done = tasks().filter(doneToday);
+  const showingDone = ui.showDone.has(TODAY);
+  return h(
+    'section',
+    { class: 'board-column board-column--active', 'aria-label': 'Today', dataset: { column: TODAY } },
+    h(
+      'header',
+      { class: 'board-column__header' },
+      h('h2', { class: 'board-column__name' }, 'Today'),
+      h('span', { class: 'board-column__count', 'aria-label': `${open.length} open` }, String(open.length)),
+      done.length
+        ? h(
+            'button',
+            {
+              class: 'board-column__sub board-column__done-toggle label',
+              type: 'button',
+              'aria-expanded': String(showingDone),
+              onclick: () => {
+                if (showingDone) ui.showDone.delete(TODAY);
+                else ui.showDone.add(TODAY);
+                render();
+              },
+            },
+            showingDone ? 'Hide done' : `${done.length} done today`
+          )
+        : h('span', { class: 'board-column__sub label' }, open.length ? 'Due today and overdue' : 'Clear')
+    ),
+    h(
+      'div',
+      { class: 'board-column__cards' },
+      open.map((t) => renderCard(t, { project: true })),
+      !open.length && h('p', { class: 'board-column__empty' }, 'Nothing due today'),
+      showingDone && done.map((t) => renderCard(t, { done: true }))
+    ),
+    h(
+      'footer',
+      { class: 'board-column__footer' },
+      h('button', { class: 'quiet-button', type: 'button', onclick: () => startAdding(TODAY) }, icon('plus'), 'Add task')
+    )
+  );
+}
+
 function renderCategoryForm() {
   return h(
     'form',
@@ -756,13 +830,19 @@ function render() {
   state.stale = false;
   const refocus = focusedField();
   const list = columns();
-  if (!list.some((c) => c.id === ui.activeCategory)) ui.activeCategory = list[0]?.id ?? null;
+  if (ui.activeCategory !== TODAY && !list.some((c) => c.id === ui.activeCategory)) ui.activeCategory = list[0]?.id ?? null;
   renderHeader();
   renderSync();
   renderTabs(list);
   renderSidebar(list);
   const index = list.findIndex((c) => c.id === ui.activeCategory);
-  $('#board').replaceChildren(index === -1 ? renderEmptyBoard() : renderColumn(list[index], index, list));
+  $('#board').replaceChildren(
+    ui.activeCategory === TODAY && list.length
+      ? renderToday()
+      : index === -1
+        ? renderEmptyBoard()
+        : renderColumn(list[index], index, list)
+  );
   syncEditor();
   if (refocus) $(refocus)?.focus({ preventScroll: true });
 }
@@ -802,6 +882,14 @@ function complete(id, card) {
 
 function reopen(id) {
   dispatch([{ type: 'reopen', id }]);
+}
+
+function dueToday(id) {
+  const t = findTaskById(id);
+  if (!t || t.due === today) return;
+  const snapshot = structuredClone(t);
+  dispatch([{ type: 'update', id, patch: { due: today } }]);
+  toast('Due today', restoreTask(snapshot));
 }
 
 function moveTask(id, columnId) {
@@ -915,8 +1003,12 @@ function openNewTask(columnId) {
   ui.creatingIn = columnId;
   ui.editingId = null;
   editorForm.elements.tagQuery.value = '';
-  const category = columnId === UNCATEGORIZED ? null : columnId;
-  fillEditor({ title: '', notes: '', due: null, repeat: null, tags: [], category }, { categoryId: columnId });
+  const forToday = columnId === TODAY;
+  const category = forToday || columnId === UNCATEGORIZED ? null : columnId;
+  fillEditor(
+    { title: '', notes: '', due: forToday ? today : null, repeat: null, tags: [], category },
+    { categoryId: forToday ? UNCATEGORIZED : columnId }
+  );
   showEditor(true);
   render();
   editorForm.elements.title.focus();
@@ -960,7 +1052,7 @@ function saveEditor() {
     };
     ui.creatingIn = null;
     ui.editingId = task.id;
-    ui.activeCategory = category ?? UNCATEGORIZED;
+    if (ui.activeCategory !== TODAY || !task.due || task.due > today) ui.activeCategory = category ?? UNCATEGORIZED;
     showEditor(false);
     dispatch([{ type: 'add', task }]);
     return;
@@ -977,7 +1069,7 @@ function saveEditor() {
   if ((f.due.value || null) !== (t.due ?? null)) patch.due = f.due.value || null;
   if (f.repeat.value !== 'custom' && f.repeat.value !== presetFor(t.repeat)) patch.repeat = f.repeat.value || null;
   if (!Object.keys(patch).length) return;
-  if ('category' in patch) {
+  if ('category' in patch && ui.activeCategory !== TODAY) {
     ui.activeCategory = category ?? UNCATEGORIZED;
     saveUi();
   }
