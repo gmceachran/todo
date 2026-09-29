@@ -23,9 +23,13 @@ Writing:
   category rename <ref> <name>
   category delete <ref> [--move-to REF | --delete-tasks]
   mark-suggested <key>...      Record source keys the brief has shown as suggestions
+  log-brief <file|->           Record what a brief raised: {"themes","items":[{key,summary}],"entries":[key],"dismiss","undismiss":[{kind,key}]}
+  focus set <file|->           Set today's focuses: [{"title","tasks":[ref]}], at most 3; [] clears them
   apply <file|->               Apply a JSON array of operations in one commit
 
 Brief helpers:
+  brief-log                    What past briefs raised, dismissed, and read, with today's focuses
+  focus                        Today's focuses
   link <file|->                Print an app link that adds a JSON array of tasks when opened
   journal                      Print the work and personal journals ($TODO_JOURNAL_REPO or gmceachran/journal)
 
@@ -159,6 +163,7 @@ function specToOp(doc, spec) {
     };
   }
   if (type === 'markSuggested') return { type, keys: rest.keys || [] };
+  if (type === 'logBrief' || type === 'setFocus') return { type, ...rest };
   const target = id ? resolveRef(doc, id) : { source: typeof source === 'string' ? source : source?.key };
   if (!target.id && !target.source) throw new Error(`Operation needs an id or source: ${JSON.stringify(spec)}`);
   if (type === 'update') {
@@ -194,6 +199,8 @@ async function mutate(buildOps) {
     const name = r.task?.title || r.category?.name || op.task?.title || op.category?.name || op.id || op.source;
     if (r.skipped) return `skipped (${r.skipped}): ${name}`;
     if (op.type === 'markSuggested') return `marked ${r.marked} suggested`;
+    if (op.type === 'logBrief') return 'brief log updated';
+    if (op.type === 'setFocus') return r.focus ? `focus: ${r.focus.items.map((f) => f.title).join(' · ')}` : 'focus cleared';
     return `${op.type}: ${name}  [${r.task?.id || r.category?.id}]`;
   };
   print(
@@ -328,6 +335,38 @@ async function run() {
       if (!args.length) throw new Error('mark-suggested needs at least one source key');
       await mutate(() => [{ type: 'markSuggested', keys: args }]);
       return;
+    case 'brief-log': {
+      const { doc } = await getStore().load();
+      const { themes, items, entries } = doc.briefLog;
+      const rows = (group) =>
+        Object.entries(group).map(
+          ([key, e]) => `  ${key}  ${e.summary}  (raised ${e.raised.join(', ') || 'never'}${e.dismissed ? `; dismissed ${e.dismissed}` : ''})`
+        );
+      const text = [
+        'Themes', ...rows(themes),
+        '', 'Items', ...rows(items),
+        '', 'Journal entries read', ...Object.entries(entries).map(([key, date]) => `  ${key}  (${date})`),
+      ].join('\n');
+      print({ ...doc.briefLog, focus: doc.focus }, text);
+      return;
+    }
+    case 'log-brief': {
+      const input = JSON.parse(readInput(args[0]));
+      await mutate(() => [{ ...input, type: 'logBrief' }]);
+      return;
+    }
+    case 'focus': {
+      if (args[0] === 'set') {
+        const focuses = JSON.parse(readInput(args[1]));
+        if (!Array.isArray(focuses)) throw new Error('focus set expects a JSON array');
+        await mutate(() => [{ type: 'setFocus', focuses }]);
+        return;
+      }
+      const { doc } = await getStore().load();
+      const focus = doc.focus?.date === today ? doc.focus : null;
+      print(focus, focus ? focus.items.map((f) => `  ${f.title}`).join('\n') : 'No focus set for today.');
+      return;
+    }
     case 'apply': {
       const specs = JSON.parse(readInput(args[0]));
       if (!Array.isArray(specs)) throw new Error('apply expects a JSON array');

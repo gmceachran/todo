@@ -7,7 +7,11 @@ const DAY_MS = 86400000;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function emptyDoc() {
-  return { version: SCHEMA_VERSION, categories: [], tasks: [], suggested: {}, removed: {} };
+  return { version: SCHEMA_VERSION, categories: [], tasks: [], suggested: {}, removed: {}, briefLog: emptyBriefLog(), focus: null };
+}
+
+function emptyBriefLog() {
+  return { themes: {}, items: {}, entries: {} };
 }
 
 // region dates
@@ -258,6 +262,11 @@ export function normalizeDoc(doc) {
   if (!Array.isArray(result.tasks)) result.tasks = [];
   if (!result.suggested || typeof result.suggested !== 'object') result.suggested = {};
   if (!result.removed || typeof result.removed !== 'object') result.removed = {};
+  const log = result.briefLog && typeof result.briefLog === 'object' ? result.briefLog : {};
+  result.briefLog = Object.fromEntries(
+    Object.keys(emptyBriefLog()).map((key) => [key, log[key] && typeof log[key] === 'object' ? log[key] : {}])
+  );
+  if (result.focus === undefined) result.focus = null;
   result.tasks = result.tasks.filter((t) => STATUSES.includes(t.status));
   for (const task of result.tasks) {
     if (!Array.isArray(task.tags)) task.tags = [];
@@ -379,6 +388,21 @@ export function applyOp(doc, op, ctx = {}) {
     for (const key of op.keys || []) if (cleanText(key)) doc.suggested[cleanText(key)] = today;
     pruneLog(doc.suggested, today);
     return { marked: (op.keys || []).length };
+  }
+
+  if (op.type === 'logBrief') return logBrief(doc.briefLog, op, today);
+
+  if (op.type === 'setFocus') {
+    const items = (op.focuses || [])
+      .map((f) => (typeof f === 'string' ? { title: f } : f || {}))
+      .filter((f) => cleanText(f.title))
+      .slice(0, 3)
+      .map((f) => ({
+        title: cleanText(f.title),
+        tasks: [...new Set((f.tasks || []).map((ref) => findTask(doc, typeof ref === 'string' ? { id: ref } : ref)?.id).filter(Boolean))],
+      }));
+    doc.focus = items.length ? { date: today, items } : null;
+    return { focus: doc.focus };
   }
 
   if (op.type === 'add') {
@@ -533,9 +557,46 @@ export function describeOp(op, doc) {
     return `${op.type} "${name}"`;
   }
   if (op.type === 'markSuggested') return `markSuggested ${(op.keys || []).length}`;
+  if (op.type === 'logBrief' || op.type === 'setFocus') return op.type;
   const task = op.task?.title ? op.task : findTask(doc, op);
   const title = task?.title ? `"${task.title}"` : op.id || op.source || '';
   return `${op.type} ${title}`.trim();
+}
+
+const BRIEF_LOG_DAYS = 60;
+
+function logBrief(log, op, today) {
+  const note = (kind, input, change) => {
+    const key = cleanText(input?.key);
+    if (!key) return;
+    const entry = (log[kind][key] ??= { summary: '', raised: [] });
+    if (cleanText(input.summary)) entry.summary = cleanText(input.summary);
+    change(entry);
+  };
+  for (const kind of ['themes', 'items']) {
+    for (const input of op[kind] || []) {
+      note(kind, input, (entry) => {
+        if (!entry.raised.includes(today)) entry.raised.push(today);
+      });
+    }
+  }
+  for (const input of op.dismiss || []) {
+    if (['themes', 'items'].includes(input?.kind)) note(input.kind, input, (entry) => (entry.dismissed = today));
+  }
+  for (const input of op.undismiss || []) {
+    if (['themes', 'items'].includes(input?.kind)) note(input.kind, input, (entry) => delete entry.dismissed);
+  }
+  for (const key of op.entries || []) if (cleanText(key)) log.entries[cleanText(key)] ??= today;
+
+  const cutoff = addDays(today, -BRIEF_LOG_DAYS);
+  for (const kind of ['themes', 'items']) {
+    for (const [key, entry] of Object.entries(log[kind])) {
+      entry.raised = entry.raised.filter((date) => date >= cutoff);
+      if (!entry.raised.length && !entry.dismissed) delete log[kind][key];
+    }
+  }
+  pruneLog(log.entries, today, BRIEF_LOG_DAYS);
+  return { briefLog: log };
 }
 
 export function pruneLog(log, today, days = 120) {

@@ -86,6 +86,34 @@ test('completing a recurring task unchecks its subtasks', () => {
   assert.equal(task.subtasks[0].done, false);
 });
 
+test('the brief log records what was raised, dismissals, and read entries, and forgets old dates', () => {
+  const doc = emptyDoc();
+  const day = (today) => ({ ...ctx, today });
+  applyOp(doc, { type: 'logBrief', themes: [{ key: 'pace', summary: 'Slowing down in reviews' }], entries: ['work:2026-09-20'] }, day('2026-07-01'));
+  applyOp(doc, { type: 'logBrief', themes: [{ key: 'pace' }], items: [{ key: 'linear:DPQ-2188', summary: 'Python coverage PR' }] }, day('2026-09-24'));
+  applyOp(doc, { type: 'logBrief', dismiss: [{ kind: 'items', key: 'linear:DPQ-2188' }], entries: ['work:2026-09-20'] }, day('2026-09-25'));
+  const log = doc.briefLog;
+  assert.deepEqual(log.themes.pace, { summary: 'Slowing down in reviews', raised: ['2026-09-24'] });
+  assert.equal(log.items['linear:DPQ-2188'].dismissed, '2026-09-25');
+  assert.deepEqual(log.entries, { 'work:2026-09-20': '2026-09-25' });
+  applyOp(doc, { type: 'logBrief', undismiss: [{ kind: 'items', key: 'linear:DPQ-2188' }] }, day('2026-12-01'));
+  assert.deepEqual(log.items, {});
+  assert.deepEqual(log.themes, {});
+});
+
+test('focus keeps up to three titled goals with the tasks they gather', () => {
+  const doc = emptyDoc();
+  const { task } = applyOp(doc, { type: 'add', task: { title: 'Mask PII', source: 'linear:DPQ-2304' } }, ctx);
+  const focuses = [{ title: 'Ship PostHog', tasks: [task.id, { source: 'linear:DPQ-2304' }, 'nope'] }, 'Rest', '', 'Read', 'Extra'];
+  applyOp(doc, { type: 'setFocus', focuses }, ctx);
+  assert.deepEqual(doc.focus, {
+    date: '2026-09-24',
+    items: [{ title: 'Ship PostHog', tasks: [task.id] }, { title: 'Rest', tasks: [] }, { title: 'Read', tasks: [] }],
+  });
+  applyOp(doc, { type: 'setFocus', focuses: [] }, ctx);
+  assert.equal(doc.focus, null);
+});
+
 test('source keys dedupe additions and deleted tasks stay deleted', () => {
   const doc = emptyDoc();
   const first = applyOp(doc, { type: 'add', task: { title: 'Fix login', source: 'linear:RM-12' } }, ctx);
