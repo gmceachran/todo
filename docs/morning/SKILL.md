@@ -28,10 +28,10 @@ so he starts the day oriented instead of buried. Gabe usually replies in the sam
 
 ## Setup
 
-The routine prompt leaves the token in `$HOME/.todo-token` and a clone of `gmceachran/todo` at `$HOME/todo`. Each shell call is fresh, so start every call that uses the CLI with:
+The prompt above these instructions gives an `export` line with the token, and a clone of `gmceachran/todo` into `$HOME/todo`. Run the clone once. Each shell call is fresh, so start every call that uses the CLI with that export line and:
 
 ```sh
-tasks() { GITHUB_TOKEN="$(cat "$HOME/.todo-token")" TODO_TZ=America/New_York node "$HOME/todo/cli/tasks.mjs" --by brief "$@"; }
+tasks() { node "$HOME/todo/cli/tasks.mjs" --by brief "$@"; }
 ```
 
 Check it with `tasks categories`. If setup or a CLI call fails, keep going. Put one plain line at the top of Today's tasks naming the error, and skip whatever needs the board or the log.
@@ -97,6 +97,7 @@ Linear is read-only (see Ground rules).
    - Get Gabe's assigned issues that aren't completed or canceled, plus assigned issues closed in the last 7 days.
    - Compare with `tasks list --status all --json`.
    - Build one array and pipe it to `tasks apply -`:
+     - Skip any issue whose parent issue is on the board as a task keyed `linear:<parent ID>`. It's tracked there as a subtask.
      - For each open issue with no board task keyed `linear:<ID>`: `{"op":"add","title":"<issue title>","source":{"key":"linear:<ID>","url":"<url>","label":"<ID>"},"due":"<Linear due date, else a guess>","tags":["<tag>"],"category":"<project name, else team name>"}`. Add no notes. The CLI skips issues already on the board or deleted from it.
      - For each open board task whose issue is now closed: `{"op":"complete","source":"linear:<ID>"}`.
    - Skip the call when the array is empty.
